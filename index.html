@@ -2332,12 +2332,13 @@ img.nav-close:hover {background-color:red;}
 .folder {background: url(img/folder.png) no-repeat;}
 .setting {background: url(img/setting.png) no-repeat;}
 .key {background: url(img/key.png) no-repeat;}
+.reload {background: url(img/reload.png) no-repeat;}
 .full-box {position: fixed;top: 0px; bottom: 0px; left: 0px; right:0px;background: rgba(128,128,128,0.5);z-index: 6;}
-.conn-box,.error-box,.folder-box,.new-box,.modify-box,.setting-box {position: absolute;top: 0px;left: 30%;z-index: 11;}
-.conn-header,.error-header,.folder-header,.new-header,.modify-header,.setting-header {line-height: 32px;height: 32px;width: 500px;margin: 100px auto;padding: 0px 10px; border-radius: 5px 5px 0px 0px;color:white;background: #333;}
-.conn-header img,.error-header img,.folder-header img,.new-header img,.modify-header img,.setting-header img {height:15px;width: 15px;border-radius: 50px;margin-top: 8px;float: right;}
-.conn-header img:hover, .error-header img:hover,.folder-header img:hover,.new-header img:hover,.modify-header img:hover,.setting-header img:hover{background: red;}
-.conn-content,.error-content,.folder-content,.new-content,.modify-content,.setting-content {margin: -100px auto; border-top: 1px solid #555;background: #444;width: 500px; padding: 10px;}
+.conn-box,.error-box,.folder-box,.new-box,.modify-box,.setting-box,.private-box {position: absolute;top: 0px;left: 30%;z-index: 11;}
+.conn-header,.error-header,.folder-header,.new-header,.modify-header,.setting-header,.private-header {line-height: 32px;height: 32px;width: 500px;margin: 100px auto;padding: 0px 10px; border-radius: 5px 5px 0px 0px;color:white;background: #333;}
+.conn-header img,.error-header img,.folder-header img,.new-header img,.modify-header img,.setting-header img,.private-header img {height:15px;width: 15px;border-radius: 50px;margin-top: 8px;float: right;}
+.conn-header img:hover, .error-header img:hover,.folder-header img:hover,.new-header img:hover,.modify-header img:hover,.setting-header img:hover,.private-header img:hover {background: red;}
+.conn-content,.error-content,.folder-content,.new-content,.modify-content,.setting-content,.private-content {margin: -100px auto; border-top: 1px solid #555;background: #444;width: 500px; padding: 10px;}
 .host-info input[name="host"] {display: inline-block;width: 150px;margin-right:28px;}
 .host-info input[name='port'] {display: inline-block;width: 50px;}
 .login-type {text-align: center;color:white;}
@@ -2346,18 +2347,19 @@ img.nav-close:hover {background-color:red;}
 .folder-content-btn{text-align: center;}
 .folder-content-btn img {width: 25px;height:25px;margin-right: 10px;}
 .folder-content-btn img:hover {background:#111;box-shadow: 0px 0px 2px #000 inset;}
-.conn-content input,.new-content input,.modify-content input,.setting-content input {
+.conn-content input,.new-content input,.modify-content input,.setting-content input,.private-content input {
     display: block;height: 32px;width: 250px;margin: 10px auto;
     border-radius: 5px;outline:none;border: 1px solid #ccc;
     box-shadow:0px 0px 2px #ccc inset;background:white;
     padding: 0px 10px;
 }
-.conn-content input:focus,.new-content input:focus,.modify-content input:focus,.setting-content input:focus{box-shadow:0px 0px 5px #5675B9 inset}
-.conn-btn,.new-btn,.mod-btn,.setting-btn {text-align: center;}
-.conn-btn button,.new-btn button,.mod-btn button,.setting-btn button {height: 32px;width: 50px;margin-right: 10px;background:transparent;border: none;color: white;border-radius:5px;padding:2px 5px;}
-.conn-btn button:hover,.new-btn button:hover,.mod-btn button:hover,.setting-btn button:hover{background:#222;box-shadow: 0px 0px 2px #000 inset;}
+.conn-content input:focus,.new-content input:focus,.modify-content input:focus,.setting-content input:focus,.private-content input:focus{box-shadow:0px 0px 5px #5675B9 inset}
+.conn-btn,.new-btn,.mod-btn,.setting-btn,.private-btn {text-align: center; margin-top: 10px;}
+.conn-btn button,.new-btn button,.mod-btn button,.setting-btn button,.private-btn button {height: 32px;width: 50px;margin-right: 10px;background:transparent;border: none;color: white;border-radius:5px;padding:2px 5px;}
+.conn-btn button:hover,.new-btn button:hover,.mod-btn button:hover,.setting-btn button:hover,.private-btn button:hover{background:#222;box-shadow: 0px 0px 2px #000 inset;}
 .host-info{text-align: center;}
-#FolderDialog, #fileDialog {display: inline;position: relative;top:-40px;left:390px;width: 65px;height:auto;border:none;padding:0px;margin:0px;}
+.keyTypeBox { text-align: left; color: white; width: 270px; margin: 0px auto 20px auto;}
+.keyTypeBox select {margin-left: 40px;}
 .logo {height: 130px; width: 130px; margin: 150px auto; background:url('img/icon.png') no-repeat;}
 .contextMenu {position: fixed; border-radius: 2px; font-size: 15px;color: white; background-color:#333;z-index: 15;}
 .contextMenu li {height: 30px; line-height:30px;margin-bottom: 5px;padding: 0px 10px;}
@@ -2382,6 +2384,10 @@ img.nav-close:hover {background-color:red;}
 .box-left {left:0px;top:22px;bottom:0px;width:3px;}
 .box-bottom{left:0px;right:0px;bottom:0px;height:3px;}
 .box-right {right:0px;top:22px;bottom:0px;width:3px;}
+.conn-nav div, .top-box span{user-select: none;}
+#term-box div::selection, #term-box span::selection { background-color: orange; color:white;}
+.select-box input {margin: 0px auto;}
+.select-box button { display: inline; position: relative; top: -30px; left: 400px; border: 2px solid yellow; background: #444; border-radius: 5px; color: white; }
     </style>
 </head>
 <body>
@@ -2405,23 +2411,22 @@ img.nav-close:hover {background-color:red;}
             <li class='folder' title='连接列表'></li>
             <li class='setting' title='设置'></li>
             <li class='key' title='生成sshKey'></li>
+            <!-- <li class='reload' title='reload'></li> -->
         </ul>
     </div>
     <div class='logo'></div>
-    <script src='static/js/jquery.min.js'>
-    <script src='static/js/xterm.js'>
-    <script src='static/js/fit.js'>
-    <script src='static/js/simpleTree.js'>
-    <script src='static/js/script.js'>
+<!--     <script src='static/js/jquery.min.js'></script>
+    <script src='static/js/xterm.js'></script>
+    <script src='static/js/fit.js'></script>
+    <script src='static/js/simpleTree.js'></script>
+    <script src='static/js/script.js'></script> -->
 </body>
 </html>
 
 <script>
-   /*
     nw.Window.get().evalNWBin(null, './bin/jquery.bin');
     nw.Window.get().evalNWBin(null, './bin/xterm.bin');
     nw.Window.get().evalNWBin(null, './bin/fit.bin');
     nw.Window.get().evalNWBin(null, './bin/simpleTree.bin');
     nw.Window.get().evalNWBin(null, './bin/script.bin');
-   */
 </script>

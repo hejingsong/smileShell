@@ -19,56 +19,31 @@ import paramiko
 import traceback
 import threading
 
-programPid = None
+pid = None
 parent_path = os.path.dirname( os.path.abspath( 'main.py' ) ).replace('\\', '/')
 log_path = parent_path+'/../logs'
 data_path = parent_path+'/../data'
-conf_path = parent_path+'/../conf'
-key_path = parent_path+'/../sshKey'
-download_path = parent_path + '/../downloadFiles'
-
+key_path = ''
+download_path = ''
 g_currentUser = getpass.getuser()
-g_userConfFile = conf_path+'/'+g_currentUser+'.conf'
-g_userDataFile = data_path+'/'+g_currentUser+'.dat'
+g_hostname = socket.gethostname()
+g_userConfFile = data_path+'/'+g_hostname+'.conf'
+g_userDataFile = data_path+'/'+g_hostname+'.dat'
 
-def setPrivateSshPath(path):
-    if not os.path.exists(conf_path):
-        os.mkdir(conf_path)
-    if path == '':
-        path = key_path
-    path = path.replace('\\', '/');
+def get_user_setting_path():
+    global key_path
+    global download_path
     try:
-        fp = open(g_userConfFile, 'wb')
-        fp.write(path)
+        fp = open( g_userConfFile, 'rb' )
+        buf = fp.read()
         fp.close()
-    except IOError:
-        return False
-    else:
-        return True
-
-def getUserFolder():
-    # 获取当前登录用户的配置文件 这个配置文件是用python pickle生成的文件
-    try:
-        fp = open( g_userDataFile, 'rb' )
-    except IOError:
-        return False
-    else:
-        data = pickle.load(fp)
-        fp.close()
-        return data
-
-def setUserFolder( data ):
-    # 设置用户的配置文件
-    if not os.path.exists(data_path):
-        os.mkdir(data_path, 0755)
-    try:
-        fp = open(g_userDataFile, 'wb')
-    except IOError:
-        return False
-    else:
-        pickle.dump(data, fp)
-        fp.close()
-        return True
+        dataJson = json.loads(buf)
+        key_path = dataJson['privatePath']
+        download_path = dataJson['downloadPath']
+    except IOError, KeyError:
+        key_path = parent_path+'/../sshKey'
+        download_path = parent_path+'/../downloadFile'
+get_user_setting_path()
 
 def write_log(status, msg):
     current_date = time.strftime( "%Y-%m-%d" )
@@ -86,7 +61,7 @@ class SshException( Exception ):
     pass
 
 class WebSocketException( Exception ):
-    pass 
+    pass
 
 class Ssh( object ):
     ''' ssh类:
@@ -115,30 +90,24 @@ class Ssh( object ):
             if len(currentPath) == 0: return '~'
             else: return currentPath[0]
         except:
+            write_log('error', 'getCurrentPath(): get current path fail.')
             return '~'
 
     def uploadFile(self, fileName):
-        retMes = dict(status=False,msg='')
-        fileList = fileName.split(';')
         remote_path = self.getCurrentPath()
         try:
             sftpClient = paramiko.SFTPClient.from_transport(self.clt.get_transport())
-            for item in fileList:
-                item = item.replace('\\', '/')
-                file = item.split('/')[-1]
-                sftpClient.put(item, remote_path+'/'+file)
-        except paramiko.SSHException:
-            retMes['mes'] = '发送失败。'
-        else:
-            retMes['status'] = True
-            retMes['mes'] = '发送成功'
+            file = fileName.split('/')[-1]
+            sftpClient.put(fileName, remote_path+'/'+file)
+        except paramiko.SSHException as e:
+            write_log('error', "uploadFile "+str(e))
+        except IOError as e:
+            write_log('error', "uploadFile "+str(e))
         finally:
             sftpClient.close()
-        return retMes
 
     def downloadFile(self, fileName):
-        retMes = dict(status=False,msg='')
-        
+        get_user_setting_path()
         remotePath = self.getCurrentPath()
         remoteFile = remotePath + '/' + fileName
         if not os.path.exists(download_path):
@@ -146,16 +115,12 @@ class Ssh( object ):
         try:
             sftpClient = paramiko.SFTPClient.from_transport(self.clt.get_transport())
             sftpClient.get(remoteFile, download_path+'/'+fileName)
-        except paramiko.SSHException:
-            retMes['mes'] = '下载失败。'
-        except IOError:
-            retMes['mes'] = '没有该文件。'
-        else:
-            retMes['status'] = True
-            retMes['mes'] = '下载成功。'
+        except paramiko.SSHException as e:
+            write_log('error', "downloadFile "+str(e))
+        except IOError as e:
+            write_log('error', "downloadFile "+str(e))
         finally:
             sftpClient.close()
-        return retMes
     
     def login(self):
         ret = dict(
@@ -179,20 +144,25 @@ class Ssh( object ):
                     hostname=self.hostInfo['host'],
                     port=int(self.hostInfo['port']),
                     username=self.hostInfo['user'],
+                    password=self.hostInfo['password'],
                     key_filename=self.hostInfo['privateKey'].replace('\\', '/')
                 )
 
-            self.chan = self.clt.invoke_shell(term='linux', width=self.size[0], height=self.size[1])
-        except socket.error:
+            self.chan = self.clt.invoke_shell(term='xterm', width=self.size[0], height=self.size[1])
+        except socket.error as e:
+            write_log('error', "login: "+str(e))
             ret['status'] = False
             ret['msg'] = u'连接ssh服务器失败。请检查主机和端口。'
-        except paramiko.BadHostKeyException:
+        except paramiko.BadHostKeyException as e:
+            write_log('error', "login: "+str(e))
             ret['status'] = False
             ret['msg'] = u'错误的密钥文件。'
-        except paramiko.AuthenticationException:
+        except paramiko.AuthenticationException as e:
+            write_log('error', "login: "+str(e))
             ret['status'] = False
             ret['msg'] = u'用户名或密码错误。'
-        except paramiko.SSHException:
+        except paramiko.SSHException as e:
+            write_log('error', "login: "+str(e))
             ret['status'] = False
             ret['msg'] = u'在连接ssh服务器的时候发生一个未知错误。'
         return ret
@@ -205,71 +175,59 @@ class Ssh( object ):
             r,w,e = select.select([self.chan, ws.webSock], [], [])
             if self.chan in r:
                 try:
-                    try:
-                        data += self.chan.recv(1024)
-                        _x = paramiko.py3compat.u(data)
-                    except UnicodeDecodeError:
-                        continue
-                    else:
-                        data = ''
-                        if len( _x ) == 0: break
-                        _resMes = json.dumps({'response': 'data', 'data': _x})
-                        ws.sendMessage(_resMes)
-                except socket.timeout: pass
+                    data += self.chan.recv(1024)
+                    _x = paramiko.py3compat.u(data)
+                except UnicodeDecodeError:
+                    continue
+                except socket.timeout:
+                    pass
+                else:
+                    data = ''
+                    if len( _x ) == 0: break
+                    _resMes = json.dumps({'response': 'data', 'data': _x})
+                    ws.sendMessage(_resMes)
             if ws.webSock in r:
                 recvData = ws.recvMessage
                 if recvData['request'] == 'resize':
                     self.chan.resize_pty(width=recvData['cols'], height=recvData['rows'])
-                elif recvData['request'] == 'upload':
-                    if recvData['data'] != '':
-                        ws.sendMessage(json.dumps({'response': 'data', 'data': '\r\n'}))
-                        self.uploadFile(recvData['data'])
-                        self.chan.sendall('\r')
+                elif recvData['request'] == 'upload' and recvData['data'] != '':
+                    # 上传文件
+                    ws.sendMessage(json.dumps({'response': 'data', 'data': '\r\n'}))
+                    self.uploadFile(recvData['data'])
+                    self.chan.sendall('\r')
+                elif recvData['request'] == 'download' and recvData['data'] != '':
+                    # 下载文件
+                    ws.sendMessage(json.dumps({'response': 'data', 'data': '\r\n'}))
+                    self.downloadFile(recvData['data'])
+                    self.chan.sendall('\r')
                 else:
                     _x = recvData['data']
-                    if len(_x) == 0: break
-                    if _x != '\r':
-                        command += _x
-                    elif command != '':
-                        commandList = command.split()
-                        command = ''
-                        if commandList[0] == 'rz':
-                            # 向webSocketClient发送上传文件事件
-                            sendStr = json.dumps({'response':'upload'})
-                            ws.sendMessage(sendStr)
-                            _x = '\x15'
-                        elif commandList[0] == 'sz' and len(commandList) > 1:
-                            # 向webSocketClient发送下载文件事件
-                            ws.sendMessage(json.dumps({'response': 'data', 'data': '\r\n'}))
-                            self.downloadFile(commandList[1])
-                            _x = '\r'
                     self.chan.send(_x)
             ws.data = ''
 
     @classmethod
-    def genKeys(self):
+    def genKeys(self, _key_json):
         # 生成密钥对
         ret = dict(
             status=True,
             msg=''
         )
-        user = getpass.getuser()
-        userConfigFile = conf_path+'/'+user+'.conf'
-        keyPath = ''
-        if not os.path.isfile(userConfigFile):
-            keyPath = key_path
-        else:
-            with open(userConfigFile, 'rb') as fp:
-                keyPath = fp.read()
-        if not os.path.exists(keyPath):
-            os.mkdir(keyPath)
-        primaryFile = '%s/Identity'%(keyPath,)
-        publicFile = '%s/Identity.pub'%(keyPath,)
+        get_user_setting_path()
+        if not os.path.exists(key_path):
+            os.mkdir( key_path )
+        primaryFile = '%s/Identity'%(key_path,)
+        publicFile = '%s/Identity.pub'%(key_path,)
         privateFp = open(primaryFile, 'wb')
         publicFp = open(publicFile, 'wb')
-        try:  
-            key = paramiko.rsakey.RSAKey.generate(2048)  
-            key.write_private_key(privateFp)
+        try:
+            if _key_json['keyType'] == '0':
+                key = paramiko.rsakey.RSAKey.generate(2048)
+            else:
+                key = paramiko.dsskey.DSSKey.generate(2048)
+            if len(_key_json['password']) == 0:
+                key.write_private_key(privateFp)
+            else:
+                key.write_private_key(privateFp, password=str.encode(_key_json['password'].encode()))
         except IOError:
             write_log('error', 'genKeys: there was an error writing to the file')
             ret['status'] = False
@@ -282,7 +240,7 @@ class Ssh( object ):
             for data in [key.get_name(),
                          ' ',
                          key.get_base64(),
-                         " %s@%s"%(user, socket.gethostname())]:
+                         " %s@%s"%(g_currentUser, g_hostname)]:
                 publicFp.write(data)
         finally:
             privateFp.close()
@@ -312,7 +270,6 @@ class WebSocket( threading.Thread ):
         try:
             self.webSock.close()
             del self.ssh
-            write_log('success', 'Thread %s is closed. '%(self.clientIp,))
         except:
             pass
 
@@ -392,7 +349,6 @@ class WebSocket( threading.Thread ):
                 "WebSocket-Location: "+str(_headers["Location"])+"\r\n\r\n"
             self.webSock.send( str.encode( str( _handshake ) ) )
             self.handshaken = True
-            write_log('success', '%s is linked.' %(_headers['Host'],))
 
     @property
     def recvMessage(self):
@@ -438,37 +394,9 @@ class WebSocket( threading.Thread ):
             self.sendMessage(_resMes)
             self.ssh = None
 
-    def dealFolder(self, recvMes):
-        # 获取 设置 用户保存的连接列表
+    def genKey(self, _key_json):
         _resMes = ''
-        if recvMes['data'] == 'get':
-            ret = getUserFolder()
-            if not ret:
-                _resMes = json.dumps({'response': 'folder', 'data': {}})
-            else:
-                _resMes = json.dumps({'response': 'folder', 'data': ret})
-        else:
-            ret = setUserFolder(recvMes['info'])
-            if not ret:
-                _resMes = json.dumps({'response': 'folder'})
-            else:
-                _resMes = json.dumps({'response': 'folder', 'info': recvMes['data']})
-        return self.sendMessage(_resMes)
-
-    def setting(self, recvMes):
-        _resMes = ''
-        if recvMes['data'] == 'privateKeyPath':
-            ret = setPrivateSshPath(recvMes['info'])
-            if not ret:
-                _resMes = json.dumps({'response':'setting', 'data': 'false'})
-            else:
-                _resMes = json.dumps({'response':'setting', 'data': 'true'})
-
-        return self.sendMessage(_resMes)
-
-    def getKey(self):
-        _resMes = ''
-        ret = Ssh.genKeys()
+        ret = Ssh.genKeys(_key_json)
         if not ret['status']:
             _resMes = json.dumps({'response':'genKey','data':'false', 'info':ret['mes']})
         else:
@@ -476,7 +404,6 @@ class WebSocket( threading.Thread ):
         return self.sendMessage(_resMes)
 
     def run(self):
-        write_log('success', 'Thread %s is start.'%(self.clientIp,))
         while True:
             if not self.handshaken:
                 self.handShake()
@@ -484,17 +411,15 @@ class WebSocket( threading.Thread ):
                 _buffer_json = self.recvMessage
                 if _buffer_json['request'] == 'init':
                     self.session(_buffer_json)
-                elif _buffer_json['request'] == 'folder':
-                    self.dealFolder(_buffer_json)
-                elif _buffer_json['request'] == 'setting':
-                    self.setting(_buffer_json)
-                elif _buffer_json['request'] == 'getKey':
-                    self.getKey()
+                elif _buffer_json['request'] == 'genKey':
+                    self.genKey(_buffer_json)
                 elif _buffer_json['request'] == 'quit':
-                    write_log('success', 'Thread %s is stop.'%(self.clientIp,))
                     break
                 elif _buffer_json['request'] == 'systemExit':
-                    os.kill(programPid, signal.SIGILL)
+                    try:
+                        os.remove(parent_path+'/../temp.exe')
+                    except: pass
+                    os.kill(pid, signal.SIGILL)
                 elif _buffer_json['request'] == '':
                     continue
                 else:
@@ -525,7 +450,7 @@ def systemExit(a, b):
     sys.exit(0)
 
 if __name__ == "__main__":
-    programPid = os.getpid()
+    pid = os.getpid()
     signal.signal(signal.SIGILL, systemExit)
     wss = WebSocketServer()
     wss.start()

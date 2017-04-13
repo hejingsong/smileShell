@@ -1,8 +1,13 @@
-var gui, win, shell, clipboard, appPath = null;
+var gui, win, shell, clipboard, appPath, fs, os = null;
 var wscArray = new Array();
 var clientNum = 0;
 var localUrl = 'ws://127.0.0.1:12345';
 var isMaxScreen = false;
+var baseDir = '';   // 程序的目录
+var dataDir = '';   // 用户存储的连接列表目录
+var dataFile = '';   // 用户存储的连接列表文件
+var confFile = '';  // 用户配置文件
+var hostname = '';  // 系统的主机名
 // websocket readyState 状态码
 // 0. CONNECTING    连接尚未建立
 // 1. OPEN          websocket已经建立
@@ -17,16 +22,26 @@ var READYSTATE = {
 
 if ( typeof(require) != 'undefined' ) {
     gui = require('nw.gui');
-    win = gui.Window.get();
     appPath = require('path');
+    fs = require("fs");
+    os = require('os');
+    win = gui.Window.get();
     shell = gui.Shell;
-    shell.openItem(appPath.dirname(process.execPath)+'/bin/webSocketServer.exe');
-    // console.log(appPath.dirname(process.execPath)+'/bin/webSocketServer.exe');
+    baseDir = appPath.dirname(process.execPath);     // 正式场景使用这个
+    // baseDir = process.cwd();                            // 开发环境使用这个
+    hostname = os.hostname();
+    dataDir = baseDir+'/data';
+    dataFile = baseDir+'/data/'+hostname+'.dat';
+    confFile = baseDir+'/data/'+hostname+'.conf';
     clipboard = gui.Clipboard.get();
+    // 打开webSocketServer
+    shell.openItem(baseDir+'/bin/webSocketServer.exe');
     // debug
-    // win.showDevTools()
+    // win.showDevTools();
     // debug end
 }
+
+/* webSocketClient class start */
 // WebSocketClient类 与服务器沟通，创建term
 function WebSocketClient($hostInfo) {
     this.hostInfo = $hostInfo;
@@ -36,6 +51,7 @@ function WebSocketClient($hostInfo) {
     this.termElement = null;
     this.sessionNum = 0;
     this.sessionStatus = false;
+    this.commandStart = '';
 }
 // 开启终端 创建导航栏 连接webSocketServer服务器
 WebSocketClient.prototype.open = function () {
@@ -125,10 +141,12 @@ WebSocketClient.prototype.destroy = function () {
         $('body').css('background-color', '#444');
     }
 }
+/* webSocketClient class end */
+/* FolderList class start */
 // 连接列表类 存储全部的连接列表
 function FolderList() {
     this.folderList = new Object();
-    this.hostList= new Object();
+    this.hostList = new Object();
     this.conn = null;
     this.listParent = null;
     this.currentNode = null;
@@ -189,7 +207,7 @@ FolderList.prototype.createNewNodeBox = function () {
     var $selectBox = $('<div class="select-box"></div>');
     var $passwordInput = $('<input type="password" name="password" placeholder="密码" />');
     var $privateInput = $('<input type="text" name="privateKey" placeholder="密钥路径" disabled="true"/>');
-    var $fileInput = $('<input id="fileDialog" type="file" name="privateKeyFile"/>');
+    var $fileBtn = $('<button>..</button>');
     var $btnBox = $('<div class="new-btn"></div>');
     var $addBtn = $('<button>新建</button>');
     var $cancelBtn = $('<button>取消</button>');
@@ -198,8 +216,17 @@ FolderList.prototype.createNewNodeBox = function () {
     $closeImg.bind('click', function () {closeDiv($fullBox);});
     $newHeader.bind('mousedown', function (event) {moveDiv(event, $newBox);});
     $passwordRadio.bind('click', function () {$selectBox.children().remove();$selectBox.append($passwordInput);});
-    $privateRadio.bind('click', function () {$selectBox.children().remove();$selectBox.append($privateInput,$fileInput);});
-    $fileInput.bind('change', function (event) { $privateInput.val(this.value); });
+    $privateRadio.bind('click', function () {$selectBox.children().remove();$selectBox.append($privateInput,$fileBtn,$passwordInput);});
+    $fileBtn.bind('click', function (event) {
+        var $fileInput = $('<input type="file" name="fileDialog" />');
+        $fileInput.css( 'display', 'none' );
+        $fileInput.bind('change', function () {
+            var $filePath = $fileInput.val();
+            $privateInput.val( $filePath );
+            $fileInput.remove();
+        });
+        $fileInput.trigger('click');
+    });
     $addBtn.bind('click', function () {
         var $hostInfo = {
             'nodeName': $linkNameInput.val(),
@@ -211,6 +238,7 @@ FolderList.prototype.createNewNodeBox = function () {
             'privateKey': $privateInput.val()
         };
         $obj.addNewNode($hostInfo);
+        closeDiv($fullBox);
     });
     $cancelBtn.bind('click', function () {closeDiv($fullBox);});
     // 显示
@@ -257,7 +285,7 @@ FolderList.prototype.createModifyNodeBox = function () {
     var $selectBox = $('<div class="select-box"></div>');
     var $passwordInput = $('<input type="password" name="password" placeholder="密码" />');
     var $privateInput = $('<input type="text" name="privateKey" placeholder="密钥路径" disabled="true" />');
-    var $fileInput = $('<input id="fileDialog" type="file" name="privateKeyFile"/>');
+    var $fileBtn = $('<button>..</button>');
     var $btnBox = $('<div class="mod-btn"></div>');
     var $modBtn = $('<button>修改</button>');
     var $cancelBtn = $('<button>取消</button>');
@@ -266,8 +294,16 @@ FolderList.prototype.createModifyNodeBox = function () {
     $closeImg.bind('click', function () {closeDiv($fullBox)});
     $modHeader.bind('mousedown', function (event) {moveDiv(event, $modBox)});
     $passwordRadio.bind('click', function () {$selectBox.children().remove();$selectBox.append($passwordInput);});
-    $privateRadio.bind('click', function () {$selectBox.children().remove();$selectBox.append($privateInput, $fileInput);});
-    $fileInput.bind('change', function () {$privateInput.val(this.value);});
+    $privateRadio.bind('click', function () {$selectBox.children().remove();$selectBox.append($privateInput, $fileBtn, $passwordInput);});
+    $fileBtn.bind('click', function () {
+        var $fileInput = $('<input type="file" />');
+        $fileInput.css( 'display', 'none');
+        $fileInput.bind('change', function () {
+            $privateInput.val($fileInput.val());
+            $fileInput.remove();
+        });
+        $fileInput.trigger('click');
+    });
     $cancelBtn.bind('click', function () {closeDiv($fullBox)});
     $modBtn.bind('click', function () {
         var $modNode = {
@@ -280,21 +316,22 @@ FolderList.prototype.createModifyNodeBox = function () {
             'privateKey': $privateInput.val()
         };
         $obj.modifyNode($modNode);
+        closeDiv($fullBox);
     });
     // 显示数据
     $linkNameInput.val($currentNodeInfo['nodeName']);
     $hostInput.val($currentNodeInfo['host']);
     $portInput.val($currentNodeInfo['port']);
     $userInput.val($currentNodeInfo['user']);
+    $passwordInput.val($currentNodeInfo['password']);
 
     if ( $currentNodeInfo['loginType'] == 0 ) {
         $passwordRadio.attr('checked', 'true');
-        $passwordInput.val($currentNodeInfo['password']);
         $selectBox.append($passwordInput);
     }else {
         $privateRadio.attr('checked', 'true');
         $privateInput.val($currentNodeInfo['privateKey']);
-        $selectBox.append($privateInput, $fileInput);
+        $selectBox.append($privateInput, $fileBtn, $passwordInput);
     }
     // 显示
     $modHeader.append($closeImg);
@@ -310,6 +347,9 @@ FolderList.prototype.createModifyNodeBox = function () {
 }
 // 添加新节点处理函数
 FolderList.prototype.addNewNode = function ($hostInfo) {
+    var $buf = new Buffer(1024);
+    var $tmpStr = '';
+    var $item = null;
     var $obj = this;
     // 错误判断
     var $hostRet = $hostInfo['host'].search(/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/g);
@@ -326,82 +366,130 @@ FolderList.prototype.addNewNode = function ($hostInfo) {
         }
     }
     // 正式添加
-    this.currentNode = $hostInfo;
-    var $tmpFolder = new Object();
-    copyJson($tmpFolder, this.hostList);
-    $tmpFolder[$hostInfo['nodeName']] = $hostInfo;
-    this.conn = new WebSocket(localUrl);
-    this.conn.onopen = function () {
-        var $sendJson = {'request':'folder', 'data':'new', 'info': $tmpFolder};
-        var $sendStr = JSON.stringify($sendJson);
-        this.send($sendStr);
-    };
-    this.conn.onerror = function () {showErrorMessage('连接webSocketServer异常。添加失败。');};
-    this.conn.onmessage = function (event) { recvMessage(event, $obj); };
+    var $node = new ListNode($hostInfo);
+    $node.createNewNode(this.listParent);
+    this.hostList[ $hostInfo['nodeName'] ] = $hostInfo;
+    this.folderList[ $hostInfo['nodeName'] ] = $node;
+    // 把配置全部写入文件
+    fs.open(dataFile, 'w', 0666, function (status, fd) {
+        if ( status ) {
+            showErrorMessage( status );
+            return;
+        }
+        for (var $item in $obj.hostList ) {
+            var $writeStr = JSON.stringify( $obj.hostList[ $item ] );
+            fs.write(fd, $writeStr+'\n', function () {});
+        }
+        fs.close(fd, function() {});
+    });
 }
 // 修改节点
 FolderList.prototype.modifyNode = function ( $modNode ) {
+    var $currentNode = $('#currentNode');
+    var $oldNodeName = $currentNode.html();
     var $obj = this;
-    var $currentNodeName = $('#currentNode').html();
-    var $tmpFolder = new Object();
-    copyJson($tmpFolder, this.hostList);
-    this.currentNode = $modNode;
-    if ( $currentNodeName == $modNode['nodeName'] ) {
-        // 连接名没有改变的情况
-        $tmpFolder[$currentNodeName] = $modNode;
+
+    if ( $oldNodeName == $modNode['nodeName'] ) {
+        // 当别名没有改变的情况
+        this.hostList[$oldNodeName] = $modNode;
+        this.folderList[$oldNodeName].hostInfo = $modNode;
     }else {
-        // 连接名被改变的情况
-        delete $tmpFolder[$currentNodeName];
-        $tmpFolder[$modNode['nodeName']] = $modNode;
+        // 当别名改变的情况
+        // 判断是否有重名
+        for ( var $item in this.hostList ) {
+            if ( $item == $modNode['nodeName'] ) {
+                showErrorMessage('该节点已经存在。');
+                return false;
+            }
+        }
+        delete this.hostList[$oldNodeName];
+        this.hostList[$modNode['nodeName']] = $modNode;
+        this.folderList[$oldNodeName] = $modNode;
+        $currentNode.html( $modNode['nodeName'] );
     }
-    this.conn = new WebSocket(localUrl);
-    this.conn.onopen = function () {
-        var $sendStr = JSON.stringify({'request':'folder', 'data':'mod','info':$tmpFolder});
-        this.send($sendStr);
-    }
-    this.conn.onerror = function () { showErrorMessage('连接webSocketServer异常。添加失败。'); }
-    this.conn.onmessage = function (event) {recvMessage(event, $obj)} 
+    // 把配置全部写入文件
+    fs.open(dataFile, 'w', 0666, function (status, fd) {
+        if ( status ) {
+            showErrorMessage( status );
+            return;
+        }
+        for (var $item in $obj.hostList ) {
+            var $writeStr = JSON.stringify( $obj.hostList[ $item ] );
+            fs.write(fd, $writeStr+'\n', function () {});
+        }
+        fs.close(fd, function() {});
+    });
+    
 }
 // 删除节点
 FolderList.prototype.deleteNode = function () {
-    var $obj = this;
     var $currentNodeName = '';
-    var $currentNode = $('#currentNode');
-    if (!$currentNode.length) {
-        showErrorMessage('没有选择节点。');
+    var $currentNode = $("#currentNode");
+    var $obj = this;
+
+    if ( !$currentNode.length ) {
+        showErrorMessage("没有选择节点");
         return false;
     }
     $currentNodeName = $currentNode.html();
-    var $tmpFolder = new Object();
-    copyJson($tmpFolder, this.folderList);
-    delete $tmpFolder[$currentNodeName];
-    this.conn = new WebSocket(localUrl);
-    this.conn.onopen = function () {
-        var $sendStr = JSON.stringify({'request':'folder','data':'del','info':$tmpFolder});
-        this.send($sendStr);
-    };
-    this.conn.onerror = function () {showErrorMessage('连接webSocketServer异常。删除失败');};
-    this.conn.onmessage = function (event) { recvMessage(event, $obj);};
+    delete this.hostList[$currentNodeName];
+    delete this.folderList[$currentNodeName];
+    $currentNode.remove();
+
+    // 把配置全部写入文件
+    fs.open(dataFile, 'w', 0666, function (status, fd) {
+        if ( status ) {
+            showErrorMessage( status );
+            return;
+        }
+        for (var $item in $obj.hostList ) {
+            var $writeStr = JSON.stringify( $obj.hostList[ $item ] );
+            fs.write(fd, $writeStr+'\n', function () {});
+        }
+        fs.close(fd, function() {});
+    });
 }
-// 向服务器发起请求 请求用户保存的连接列表
+// 读取用户保存的数据文件
 FolderList.prototype.requestFolderList = function () {
     var $obj = this;
-    this.conn = new WebSocket(localUrl);
-    this.conn.onopen = function () {
-        var $sendStr = JSON.stringify({'request': 'folder', 'data': 'get'});
-        this.send($sendStr);
-        $obj.requestFolderNum = 0;
-    };
-    this.conn.onerror = function () { 
-        if (++$obj.requestFolderNum > 3) {
-            showErrorMessage('获取列表失败。请检查webSocketServer是否开启。');
-        }else {
-            $obj.requestFolderList();
-        }
-    };
-    this.conn.onmessage = function (event) { recvMessage(event, $obj); };
+    fs.exists(dataDir, function (result) {
+        // 判断目录是否存在
+        if (!result) {
+            // 不存在
+            fs.mkdir(dataDir, 0755, function (err) {
+                if (err) {
+                    showErrorMessage("创建用户数据目录失败。");
+                }
+                fs.open(dataFile, 'w', 0666, function (err) {
+                    if(err) {
+                        showErrorMessage("创建用户数据文件失败。");
+                    }
+                });
+            });
+        } else {
+            // 目录存在
+            // 判断文件是否存在
+            fs.exists(dataFile, function (result) {
+                if (!result) {
+                    // 文件不存在
+                    fs.open(dataFile, 'w', 0666, function (err, fp) {
+                        if(err) {
+                            showErrorMessage("创建用户数据文件失败。");
+                        }else {
+                            fs.close(fp);
+                        }
+                    });
+                }else {
+                    // 文件存在
+                    decryptedFile($obj);
+                };
+            })
+        };
+    })
 }
-// FolderList Node class
+
+/* FolderList class end */
+/* ListNode class start */
 function ListNode($hostInfo) {
     this.hostInfo = $hostInfo;
     this.node = null;
@@ -424,12 +512,14 @@ ListNode.prototype.createNewNode = function ($parent) {
 ListNode.prototype.destroy = function () {
     this.node.remove();
 }
+/* ListNode class end */
+/* Setting class start */
 // 设置类
 function Setting() {
-    this.conn = null;
+    this.createSettingBox();
 }
 // 创建存储privateKey路径框
-Setting.prototype.createSshPrivateBox = function () {
+Setting.prototype.createSettingBox = function () {
     var $obj = this;
     var $fullBox = $('<div class="full-box"></div>');
     var $settingBox = $('<div class="setting-box"></div>');
@@ -437,46 +527,143 @@ Setting.prototype.createSshPrivateBox = function () {
     var $closeImg = $('<img src="img/close.png"/>');
     var $settingContent = $('<div class="setting-content"></div>');
     var $privateKeyInput = $('<input type="text" name="privateKeyPath" placeholder="sshKey存储路径(./sshKey/)" disabled="true" />');
-    var $selectFolder = $('<input type="file" id="FolderDialog" nwdirectory/>');
+    var $selectBtn = $('<button>..</button>');
+    var $downLoadInput = $('<input type="text" name="downloadPath" placeholder="下载路径(./downloadFile/)" disabled="true"/>');
+    var $selectBtn1 = $('<button>..</button>');
     var $settingBtn = $('<div class="setting-btn"></div>');
     var $trueBtn = $('<button>确定</button>');
     var $falseBtn = $('<button>取消</button>');
-
     // 事件绑定
     $settingHeader.bind('mousedown', function (event) {moveDiv(event, $settingBox)});
     $closeImg.bind('click', function () {closeDiv($fullBox);});
-    $selectFolder.bind('change', function () {$privateKeyInput.val(this.value);});
+    $selectBtn.bind('click', function() {
+        var $selectFolder = $('<input type="file" nwdirectory />');
+        $selectFolder.css('display', 'none');
+        $selectFolder.bind('change', function() {
+            $privateKeyInput.val($selectFolder.val());
+            $selectFolder.remove();
+        });
+        $selectFolder.trigger('click');
+    });
+    $selectBtn1.bind('click', function() {
+        var $selectFolder1 = $('<input type="file" nwdirectory />');
+        $selectFolder1.css('display', 'none');
+        $selectFolder1.bind('change', function() {
+            $downLoadInput.val($selectFolder1.val());
+            $selectFolder1.remove();
+        });
+        $selectFolder1.trigger('click');
+    });
     $falseBtn.bind('click', function () {closeDiv($fullBox);});
     $trueBtn.bind('click', function () {
         var $privateKeyPath = $privateKeyInput.val();
-        $obj.setPrivateSshPath($privateKeyPath);
+        var $downloadPath = $downLoadInput.val();
+        $obj.setSystemPath($privateKeyPath, $downloadPath);
         closeDiv($fullBox);
     });
     // 显示
+    $selectBtn.css({
+        'display': 'inline',
+        'position': 'relative',
+        'top': '-39px',
+        'left': '395px',
+        'border': '2px solid yellow',
+        'background-color': '#444',
+        'border-radius': '5px',
+        'color': 'white'
+    });
+    $selectBtn1.css({
+        'display': 'inline',
+        'position': 'relative',
+        'top': '-39px',
+        'left': '395px',
+        'border': '2px solid yellow',
+        'background-color': '#444',
+        'border-radius': '5px',
+        'color': 'white'
+    });
     $settingHeader.append($closeImg);
     $settingBtn.append($trueBtn, $falseBtn);
-    $settingContent.append($privateKeyInput, $selectFolder, $settingBtn);
+    $settingContent.append($privateKeyInput, $selectBtn, $downLoadInput, $selectBtn1, $settingBtn);
     $settingBox.append($settingHeader, $settingContent);
     $fullBox.append($settingBox);
     $('body').append($fullBox);
 }
-// 设置privateKey 存储路径
-Setting.prototype.setPrivateSshPath = function ($path) {
+// 设置privateKey存储路径, 下载文件路径
+Setting.prototype.setSystemPath = function ($privatePath, $downloadPath) {
+    var $pathJson = {"privatePath": ($privatePath=="")?baseDir+"/sshKey":$privatePath, "downloadPath":($downloadPath=="")?baseDir+"/downloadFile":$downloadPath};
+    var $pathStr = JSON.stringify( $pathJson );
+    var $buf = new Buffer( $pathStr );
+    fs.exists(dataDir, function (result) {
+        // 判断目录是否存在
+        if (!result) {
+            // 不存在
+            fs.mkdir(dataDir, 0755, function (err) {
+                if (err) {
+                    showErrorMessage("创建用户数据目录失败。");
+                }
+            });
+        }
+    });
+    fs.open(confFile, 'w', 0644, function (err, fp) {
+        if (err) {
+            showErrorMessage(err);
+        }else {
+            fs.write(fp, $buf, function(err) {
+                if (err) {
+                    showErrorMessage(err);
+                }
+            });
+            fs.close(fp);
+        }
+    });
+}
+/* Setting class end */
+/* privateKey class start */
+function PrivateKey() {
+    this.conn = null;
+    this.createPrivateKeyBox();
+}
+// 创建用户选择sshkey的界面
+PrivateKey.prototype.createPrivateKeyBox = function() {
     var $obj = this;
-    this.conn = new WebSocket(localUrl);
-    this.conn.onopen = function () {
-        var $sendStr = JSON.stringify({'request':'setting', 'data':'privateKeyPath', 'info':$path});
-        this.send($sendStr);
-    };
-    this.conn.onerror = function () {showErrorMessage('连接webSocketServer异常。设置失败。');};
-    this.conn.onmessage = function (event) {recvMessage(event, $obj)};
+    var $fullBox = $('<div class="full-box"></div>');
+    var $privateBox = $('<div class="private-box"></div>');
+    var $privateHeader = $('<div class="private-header">生成密钥</div>');
+    var $closeImg = $('<img src="img/close.png"/>');
+    var $privateContent = $('<div class="private-content"></div>');
+    var $keyTypeBox = $('<div class="keyTypeBox">密钥类型: </div>');
+    var $keyTypeInput = $('<select name="keyType"><option value="0">RSA</option><option value="1">DSA</option></select>');
+    var $keyPasswordInput = $('<input type="password" name="keyPassword" placeholder="密钥密码" />');
+    var $privateBtn = $('<div class="private-btn"></div>');
+    var $trueBtn = $('<button>确定</button>');
+    var $falseBtn = $('<button>取消</button>');
+    // 事件绑定
+    $privateHeader.bind('mousedown', function(event) {moveDiv(event, $privateBox);});
+    $closeImg.bind('click', function(){closeDiv($fullBox)});
+    $trueBtn.bind('click', function() {
+        // 确定按钮按下
+        var $keyType = $keyTypeInput.val();
+        var $keyPass = $keyPasswordInput.val();
+        var $dataJson = {"request":"genKey","keyType":$keyType,"password":$keyPass};
+        var $dataStr = JSON.stringify( $dataJson );
+        $obj.conn = new WebSocket(localUrl);
+        $obj.conn.onopen = function() { this.send( $dataStr ); }
+        $obj.conn.onerror = function() { showErrorMessage("连接webSocketServer失败。请启动webSocketServer，重启软件"); }
+        $obj.conn.onmessage = function(event) { recvMessage(event, this); }
+        closeDiv($fullBox);
+    });
+    $falseBtn.bind('click', function() {closeDiv($fullBox);});
+    // 显示
+    $privateHeader.append($closeImg);
+    $privateBtn.append($trueBtn, $falseBtn);
+    $keyTypeBox.append($keyTypeInput);
+    $privateContent.append($keyTypeBox, $keyPasswordInput, $privateBtn);
+    $privateBox.append($privateHeader, $privateContent);
+    $fullBox.append( $privateBox );
+    $('body').append($fullBox);
 }
-// json 复制
-function copyJson($newJson, $oldJson) {
-    for ( var $item in $oldJson ) {
-        $newJson[$item] = $oldJson[$item];
-    }
-}
+/* privateKey class end */
 // 发送初始化数据 登录sshServer
 function loginSshServer($crt) {
     var $cols = $crt.term.cols;
@@ -504,9 +691,45 @@ function recvMessage(event, $crt) {
             $($crt.navElement.children('img')[0]).attr('src', 'img/true.png');
             $crt.term.on('data', function ($data) {
                 if ( $crt.sessionStatus == true ) {
-                    var $sendStr = JSON.stringify({'request': 'data', 'data':$data});
-                    $crt.conn.send($sendStr);
+                    if ( $crt.commandStart == '' ) {
+                        // 记录还没有输入命令时的命令行信息
+                        $crt.commandStart = $.trim( $('.terminal-cursor').parent('div').text() );
+                    }
+                    if ( $data != '\r' ) {
+                        var $sendStr = JSON.stringify({'request': 'data', 'data':$data});
+                        $crt.conn.send($sendStr);
+                    }else {
+                        var $command = $.trim( $('.terminal-cursor').parent('div').text() );
+                        $command = $.trim( $command.replace( $crt.commandStart, '') );
+                        $command = $.trim( $command.replace(/\xa0/g, ' ') );
+                        var $commandList = $command.split(' ');
+                        // console.log( $commandList );
+                        if ( $commandList[0] == 'rz' ) {
+                            // rz 上传文件
+                            var $fileInput = $('<input type="file" name="uploadFile" />');
+                            $fileInput.css('display', 'none');
+                            $fileInput.bind('change', function() {
+                                // 发送上传文件命令
+                                var $fileName = $fileInput.val().replace(/\\/g, '/');
+                                // console.log( $fileName );
+                                var $sendStr = JSON.stringify( {"request":"upload","data":$fileName} );
+                                // console.log( $sendStr );
+                                $crt.conn.send( $sendStr );
+                                $fileInput.remove();
+                            });
+                            $fileInput.trigger('click');
+                        }else if ( $commandList[0] == 'sz' && $commandList.length >= 2 ) {
+                            // sz 下载文件
+                            var $sendStr = JSON.stringify( {"request":"download","data":$commandList[1]} );
+                            $crt.conn.send( $sendStr );
+                        }else {
+                            var $sendStr = JSON.stringify({'request': 'data', 'data':$data});
+                            $crt.conn.send($sendStr);
+                        }
+                        $crt.commandStart = '';
+                    }
                 }else if ( $data == '\r' ) {
+                    // 重新登录
                     loginSshServer($crt);
                     $($crt.navElement.children('img')[0]).attr('class', 'load');
                     $($crt.navElement.children('img')[0]).attr('src', 'img/load.png');
@@ -524,62 +747,6 @@ function recvMessage(event, $crt) {
         $($crt.navElement.children('img')[0]).attr('src', 'img/false.png');
         $crt.term.write('请按下Enter键继续会话.\r\n');
         $crt.sessionStatus = false;
-    }else if ( $recvJson['response'] == 'upload' ) {
-        // 发送文件事件
-        $fileInput = $('<input type="file" name="uploadFile">');
-        $fileInput.css('display', 'block');
-        $fileInput.bind('change', function () { unloadFile($crt, $fileInput); });
-        $('body').append($fileInput);
-        $fileInput.trigger('click');
-    }
-    // FolderList class
-    else if ( $recvJson['response'] == 'folder' ) {
-        if ( $recvJson['data'] ) {
-            // 表示成功获取到节点
-            $crt.hostList = $recvJson['data'];
-        }
-        else {
-            if ($recvJson['info'] == 'new') {
-                // 表示成功更新节点
-                // 添加节点到界面上
-                var $node = new ListNode($crt.currentNode);
-                $node.createNewNode($crt.listParent);
-                $crt.hostList[$crt.currentNode['nodeName']] = $crt.currentNode;
-                $crt.folderList[$crt.currentNode['nodeName']] = $node;
-            }
-            else if ($recvJson['info'] == 'del') {
-                // 删除
-                var $currentNode = $('#currentNode');
-                var $nodeName = $currentNode.html();
-                delete $crt.hostList[$nodeName];
-                $crt.folderList[$nodeName].destroy();
-            }else if ($recvJson['info'] == 'mod') {
-                var $currentNodeName = $('#currentNode').html();
-                if ( $currentNodeName == $crt.currentNode ) {
-                    // 名字没有改变的情况
-                    $crt.hostList[$currentNodeName] = $crt.currentNode;
-                    $crt.folderList[$currentNodeName].hostInfo = $crt.currentNode;
-                }else {
-                    delete $crt.hostList[$currentNodeName];
-                    $crt.folderList[$currentNodeName].destroy();
-                    delete $crt.folderList[$currentNodeName];
-                    var $node = new ListNode( $crt.currentNode );
-                    $node.createNewNode($crt.listParent);
-                    $crt.hostList[$crt.currentNode['nodeName']] = $crt.currentNode;
-                    $crt.folderList[$crt.currentNode['nodeName']] = $node;
-                }
-            }
-        }
-        var $sendStr = JSON.stringify({'request':'quit'});
-        $crt.conn.send( $sendStr );
-    }
-    // Setting class
-    else if ( $recvJson['response'] == 'setting' ) {
-        if ( $recvJson['data'] == 'false' ) {
-            showErrorMessage('设置失败。');
-        }
-        var $sendStr = JSON.stringify({'request': 'quit'});
-        $crt.conn.send($sendStr);
     }
     // get sshKey
     else if ( $recvJson['response'] == 'genKey' ) {
@@ -591,14 +758,6 @@ function recvMessage(event, $crt) {
         var $sendStr = JSON.stringify({'request': 'quit'});
         $crt.send($sendStr);
     }
-}
-// rz上传文件
-function unloadFile($clt, $fileObj) {
-    var $fileName = $fileObj.val();
-    var $sendJson = {'request':'upload','data':$fileName};
-    $sendStr = JSON.stringify($sendJson);
-    $clt.conn.send($sendStr);
-    $fileObj.remove();
 }
 // 显示错误信息
 function showErrorMessage($mes) {
@@ -673,6 +832,8 @@ function createConnectBox() {
         $webClient.sessionNum = clientNum;
         wscArray.push($webClient);
         clientNum++;
+        // close the quick connect box
+        closeDiv($fullBox);
     });
     $falseBtn.bind('click', function () {closeDiv($connBox);closeDiv($fullBox);});
     // 显示
@@ -702,6 +863,10 @@ function createContextMenu(event, $crt) {
     if (event.which != 3) {
         return false;
     }
+    var $minHeight = Math.floor( win.height / 3 );
+    var $minWdith = Math.floor( win.width / 3 );
+    var $maxHeight = Math.floor( win.height / 3 * 2 );
+    var $maxWidth = Math.floor( win.width / 3 * 2 );
     $('body').children('.contextMenu').remove();
     var $contextMenu = $('<div class="contextMenu"></div>');
     var $ulBox = $('<ul></ul>');
@@ -743,34 +908,95 @@ function createContextMenu(event, $crt) {
         });
     }
     $ulBox.append($copyBtn, $pasteBtn, $cpBtn);
-    $ulBox.children('li').bind('click', function () {$contextMenu.remove();$crt.term.focus();})
-    $contextMenu.css({ 
-        'top': event.pageY+10+'px',
-        'left': event.pageX+10+'px'
-    });
+    $ulBox.children('li').bind('click', function () {$contextMenu.remove();$crt.term.focus();});
+    if ( event.pageX > $maxWidth ) {
+        $contextMenu.css('left', event.pageX-110+'px');
+    }else {
+        $contextMenu.css('left', event.pageX+10+'px');
+    }
+    if ( event.pageY > $maxHeight ) {
+        $contextMenu.css('top', event.pageY-110+'px');
+    }else {
+        $contextMenu.css('top', event.pageY+10+'px');
+    }
     $contextMenu.append($ulBox);
     $('body').append($contextMenu);
+}
+
+// 加密文件
+function encryptionFile() {
+    var $clearText = '';
+    var $encrypStr = '';
+    var $b = new Base64();
+
+    // 先读取文本中的内容
+    fs.readFile(dataFile, function(err, data) {
+        if ( err ) {
+            showErrorMessage( err );
+            return;
+        }
+        $clearText = data.toString();
+        $encrypStr = $b.encode( $clearText );
+        fs.open(dataFile, 'w', 0666, function(err, fd) {
+            if (err) {
+                showErrorMessage( err );
+                return;
+            }
+            fs.write(fd, $encrypStr, function(){});
+            fs.close(fd, function() {});
+        });
+    });
+}
+
+// 解密文件
+function decryptedFile( $folderObj ) {
+    var $clearText = '';
+    var $encrypStr = '';
+    var $b = new Base64();
+
+    // 先读取文本中的内容
+    fs.readFile(dataFile, function(err, data) {
+        if ( err ) {
+            return '';
+        }
+        $encrypStr = data.toString();
+        $clearText = $b.decode( $encrypStr );
+        fs.open(dataFile, 'w', 0666, function(err, fd) {
+            if (err) {
+                showErrorMessage( err );
+                return '';
+            }
+            fs.write(fd, $clearText, function(){});
+            fs.close(fd, function() {});
+            // console.log( $clearText );
+            // 如果文件内容不为空
+            var dataList = null;
+            var dataJson = null;
+            var data = $.trim( $clearText );
+            dataList = data.split('\n');
+            // console.log( dataList );
+            for (var i=0; i<dataList.length; i++) {
+                dataJson = JSON.parse( dataList[i] );
+                $folderObj.hostList[ dataJson['nodeName'] ] = dataJson;
+            }
+        });
+    });
 }
 
 // 初始化
 $(document).ready(function () {
     var $folder = new FolderList();
     $folder.requestFolderList();
-
     // 事件绑定
-    $('.box-top').bind('mousedown', function (event) {moveDiv(event, $(window));});
     $('.show-btn').bind('click', showList);
     $('.conn').bind('click', createConnectBox);
     $('.folder').bind('click', function () { $folder.createFolderList(); });
+    // $('.reload').bind('click', function () { win.reload(); });
     $('.setting').bind('click', function () {
         var $set = new Setting();
-        $set.createSshPrivateBox();
     });
     $('.key').bind('click', function() {
-        var $conn = new WebSocket(localUrl);
-        $conn.onopen = function() {var $sendStr = JSON.stringify({'request':'getKey'});this.send($sendStr);}
-        $conn.onerror = function () {showErrorMessage('连接webSocketServer异常。创建sshKey失败。');}
-        $conn.onmessage = function (event) {recvMessage(event, this);}
+        var $key = new PrivateKey();
     });
     $(window).bind('resize', function () {
         for ( var $i = 0; $i < clientNum; $i++ ) {
@@ -800,8 +1026,10 @@ $(document).ready(function () {
         win.close();
     });
     win.on('close', function () {
+        // 加密数据文件
         // 窗口关闭事件
         // 关闭所有开启的终端
+        encryptionFile();
         this.hide();
         for ( var $index = 0; $index < clientNum; $index++ ) {
             wscArray[$index].destroy();            
