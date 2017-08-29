@@ -1,6 +1,7 @@
 var gui, win, shell, clipboard, appPath, fs, os = null;
 var wscArray = new Array();
 var clientNum = 0;
+var clientCount = 0;
 var localUrl = 'ws://127.0.0.1:12345';
 var isMaxScreen = false;
 var baseDir = '';   // 程序的目录
@@ -55,6 +56,9 @@ function WebSocketClient($hostInfo) {
 }
 // 开启终端 创建导航栏 连接webSocketServer服务器
 WebSocketClient.prototype.open = function () {
+    this.sessionNum = clientNum;
+    clientNum++;
+    clientCount++;
     this.createTerm();
     this.createNav();
     this.connectServer();
@@ -84,9 +88,6 @@ WebSocketClient.prototype.createTerm = function () {
     });
     this.term.open(this.termElement);
     this.term.fit();
-    
-    $('.term').css('z-index', '0');
-    $($obj.termElement).css('z-index', '1');
 }
 // 创建导航栏
 WebSocketClient.prototype.createNav = function () {
@@ -97,23 +98,20 @@ WebSocketClient.prototype.createNav = function () {
             '+$nodeName+'\
         </div>');
     var $closeImg = $('<img class="nav-close" src="img/close.png" title="关闭">');
-    $closeImg.bind('click', function () {$obj.destroy();});
+    $closeImg.bind('click', function () {
+        $obj.destroy();
+    });
     $nav.append($closeImg);
     $('.conn-nav').append($nav);
     $nav.bind('click', function() {
-        $('.conn-nav').children('div').css('box-shadow', '0px 0px 5px gray inset');
-        $(this).css('box-shadow', '0px 0px 10px red inset');
-        $('.term').css('z-index', '0');
-        $($obj.termElement).css('z-index', '1');
-        $obj.term.focus();
+        $obj.focus();
     });
     this.navElement = $nav;
-    if ( this.sessionNum == 0 ) {
+    if ( clientCount == 1 ) {
         $('.conn-nav').css('display', 'block');
         $('body').css('background-color', '#000');
     }
-    $('.conn-nav').children('div').css('box-shadow', '0px 0px 5px gray inset');
-    $nav.css('box-shadow', '0px 0px 10px red inset');
+    this.focus();
 }
 // 连接webSocketServer
 WebSocketClient.prototype.connectServer = function () {
@@ -125,21 +123,48 @@ WebSocketClient.prototype.connectServer = function () {
 }
 // 关闭终端、连接、导航栏
 WebSocketClient.prototype.destroy = function () {
-    this.term.destroy();
-    this.navElement.remove();
-    $(this.termElement).remove();
+    var $i = 0;
+    var $element = null;
     if ( this.sessionStatus == true ) {
         this.conn.send(JSON.stringify({'request':'data', 'data':'logout'}));
     }
     this.conn.send(JSON.stringify({'request':'quit'}));
-    this.conn.close()
+    this.conn.close();
+
+    $element = this.navElement.next('div');
+    if ( $element.length > 0 ) {
+        // next element
+        for ($i=this.sessionNum+1; $i<clientNum; $i++) {
+            if ( wscArray[$i] == undefined ) continue;
+            wscArray[$i].focus();
+            break;
+        }
+    }else {
+        // prev element
+        for ($i=this.sessionNum-1; $i>=0; $i--) {
+            if ( wscArray[$i] == undefined ) continue;
+            wscArray[$i].focus();
+            break;
+        }
+    }
     // 从数组中删除
-    wscArray.splice(this.sessionNum, 1);
-    clientNum--;
-    if ( clientNum == 0 ) { // 如果没有连接 就关闭 连接导航
+    wscArray.splice(this.sessionNum, 1, undefined);
+    clientCount--;
+    if ( clientCount == 0 ) { // 如果没有连接 就关闭 连接导航
         $('.conn-nav').css('display', 'none');
         $('body').css('background-color', '#444');
     }
+    this.term.destroy();
+    this.navElement.remove();
+    $(this.termElement).remove();
+}
+// 焦点
+WebSocketClient.prototype.focus = function() {
+    $('#current-nav').removeAttr('id');
+    this.navElement.attr('id', 'current-nav');
+    $('.term').css('z-index', '0');
+    $(this.termElement).css('z-index', '1');
+    this.term.focus();
 }
 /* webSocketClient class end */
 /* FolderList class start */
@@ -352,10 +377,11 @@ FolderList.prototype.addNewNode = function ($hostInfo) {
     var $item = null;
     var $obj = this;
     // 错误判断
-    var $hostRet = $hostInfo['host'].search(/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/g);
+    /* 这里可以DNS */
+    // var $hostRet = $hostInfo['host'].search(/^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$/g);
     var $portRet = ($hostInfo['port']>0&&$hostInfo['port']<65535)?0:-1;
-    if (($hostRet+$portRet) < 0) {
-        showErrorMessage('输入格式错误。');
+    if ( $portRet < 0 ) {
+        showErrorMessage('端口值不可取。');
         return false;
     }
     // 判断是否有重名
@@ -502,9 +528,7 @@ ListNode.prototype.createNewNode = function ($parent) {
     $li.bind('dblclick', function () {
         var $webClient = new WebSocketClient($obj.hostInfo);
         $webClient.open();
-        $webClient.sessionNum = clientNum;
         wscArray.push($webClient);
-        clientNum++;
     });
     $parent.append($li);
     this.node = $li;
@@ -701,7 +725,8 @@ function recvMessage(event, $crt) {
                     }else {
                         var $command = $.trim( $('.terminal-cursor').parent('div').text() );
                         $command = $.trim( $command.replace( $crt.commandStart, '') );
-                        $command = $.trim( $command.replace(/\xa0/g, ' ') );
+                        $command = prepareTextForClipboard($command);
+                        // $command = $.trim( $command.replace(/\xa0/g, ' ') );
                         var $commandList = $command.split(' ');
                         // console.log( $commandList );
                         if ( $commandList[0] == 'rz' ) {
@@ -829,9 +854,7 @@ function createConnectBox() {
         }
         var $webClient = new WebSocketClient($hostInfo);
         $webClient.open();
-        $webClient.sessionNum = clientNum;
         wscArray.push($webClient);
-        clientNum++;
         // close the quick connect box
         closeDiv($fullBox);
     });
@@ -858,6 +881,15 @@ function moveDiv(event, $element) {
         isMove = false;
     });;
 }
+
+function prepareTextForClipboard(text) {
+    var space = String.fromCharCode(32), nonBreakingSpace = String.fromCharCode(160), allNonBreakingSpaces = new RegExp(nonBreakingSpace, 'g'), processedText = text.split('\n').map(function (line) {
+        var processedLine = line.replace(/\s+$/g, '').replace(allNonBreakingSpaces, space);
+        return processedLine;
+    }).join('\n');
+    return processedText;
+}
+
 // 创建右键菜单
 function createContextMenu(event, $crt) {
     if (event.which != 3) {
@@ -880,8 +912,11 @@ function createContextMenu(event, $crt) {
         });
     }else {
         $pasteBtn.bind('click', function () {
-            var $sendStr = JSON.stringify({'request':'data', 'data':clipboard.get('text')});
-            $crt.conn.send($sendStr);
+            var $clipStr = clipboard.get('text');
+            $clipStr = $clipStr.replace(/\r\n/g, "\n");
+            // console.log( $clipStr );
+            $crt.term.handler($clipStr);
+            $crt.term.textarea.value = '';
         });
     }
     if ( window.getSelection().toString() == '' ) {
@@ -896,15 +931,15 @@ function createContextMenu(event, $crt) {
     }else {
         $copyBtn.bind('mousedown', function () {
             var $selectString = window.getSelection().toString();
-            $selectString = $selectString.replace(/\xa0/g, ' ');
+            $selectString = prepareTextForClipboard( $selectString );
             clipboard.set($selectString, 'text');
         });
         $cpBtn.bind('mousedown', function () {
             var $selectString = window.getSelection().toString();
-            $selectString = $selectString.replace(/\xa0/g, ' ');
-            clipboard.set($selectString, 'text')
-            var $sendStr = JSON.stringify({'request':'data', 'data':$selectString});
-            $crt.conn.send($sendStr);
+            $selectString = prepareTextForClipboard( $selectString );
+            clipboard.set($selectString, 'text');
+            $crt.term.handler($selectString);
+            $crt.term.textarea.value = '';
         });
     }
     $ulBox.append($copyBtn, $pasteBtn, $cpBtn);
@@ -1000,6 +1035,7 @@ $(document).ready(function () {
     });
     $(window).bind('resize', function () {
         for ( var $i = 0; $i < clientNum; $i++ ) {
+            if ( wscArray[$i] == undefined ) continue;
             if ( wscArray[$i].sessionStatus == true ) {
                 wscArray[$i].term.fit();
                 var $sendStr = JSON.stringify({'request':'resize', 'cols':wscArray[$i].term.cols, 'rows':wscArray[$i].term.rows});
@@ -1032,7 +1068,8 @@ $(document).ready(function () {
         encryptionFile();
         this.hide();
         for ( var $index = 0; $index < clientNum; $index++ ) {
-            wscArray[$index].destroy();            
+            if ( wscArray[$index] == undefined ) continue;
+            wscArray[$index].destroy();
         }
         // 向webSocketServer发送退出信号
         var $conn = new WebSocket(localUrl);

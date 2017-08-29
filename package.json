@@ -1,13 +1,13 @@
 {
     "name": "smileShell",
     "main": "index.html",
-    "version": "1.0.0",
+    "version": "1.3.0",
     "author": "nisonGe",
     "window": {
         "toolbar": false,
         "width": 1000,
         "height": 600,
-        "icon": "img/smile.ico",
+        "icon": "img/smile.png",
         "positon":"center",
         "resizable":true,
         "show_in_taskbar":true,
