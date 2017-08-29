@@ -19,8 +19,10 @@ import paramiko
 import traceback
 import threading
 
-pid = None
-parent_path = os.path.dirname( os.path.abspath( 'main.py' ) ).replace('\\', '/')
+pid = os.getpid()
+err_fd = None
+parent_path = os.path.abspath( '.' ).replace('\\', '/')
+# print parent_path
 log_path = parent_path+'/../logs'
 data_path = parent_path+'/../data'
 key_path = ''
@@ -45,17 +47,9 @@ def get_user_setting_path():
         download_path = parent_path+'/../downloadFile'
 get_user_setting_path()
 
-def write_log(status, msg):
-    current_date = time.strftime( "%Y-%m-%d" )
-    current_time = time.strftime( "%H:%M:%S" )
-    file_name = log_path + '/%s.log' % (current_date,)
-    content = "[%s]\t[%s]\t%s\r\n" % ( status, current_time, msg )
-
-    if not os.path.exists( log_path ):
-        os.mkdir( log_path )
-
-    with open( file_name, 'ab+' ) as fp:
-        fp.write(content)
+def write_error( err_msg ):
+    print >> err_fd, err_msg
+    err_fd.flush()
 
 class SshException( Exception ):
     pass
@@ -72,9 +66,13 @@ class Ssh( object ):
         self.size = (cols, rows)
         self.clt = None
         self.chan = None
+        self.select_list = list()
         self.handler = re.compile(r'^.*pwd\r\n(.*)\r\n.*$')
 
     def __del__(self):
+        self.destroy()
+
+    def destroy(self):
         try:
             self.chan.close()
             self.clt.close()
@@ -82,6 +80,7 @@ class Ssh( object ):
             pass
 
     def getCurrentPath(self):
+        self.select_list.remove(self.chan)
         try:
             self.chan.sendall('\x15pwd\r')
             recvData = self.chan.recv(1024)
@@ -90,8 +89,10 @@ class Ssh( object ):
             if len(currentPath) == 0: return '~'
             else: return currentPath[0]
         except:
-            write_log('error', 'getCurrentPath(): get current path fail.')
+            write_error(  "error: rz/sz pwd fail." )
             return '~'
+        finally:
+            self.select_list.append(self.chan)
 
     def uploadFile(self, fileName):
         remote_path = self.getCurrentPath()
@@ -100,9 +101,9 @@ class Ssh( object ):
             file = fileName.split('/')[-1]
             sftpClient.put(fileName, remote_path+'/'+file)
         except paramiko.SSHException as e:
-            write_log('error', "uploadFile "+str(e))
+            write_error( "error: update file, " + str(e) )
         except IOError as e:
-            write_log('error', "uploadFile "+str(e))
+            write_error( "error: update file, " + str(e) )
         finally:
             sftpClient.close()
 
@@ -116,9 +117,9 @@ class Ssh( object ):
             sftpClient = paramiko.SFTPClient.from_transport(self.clt.get_transport())
             sftpClient.get(remoteFile, download_path+'/'+fileName)
         except paramiko.SSHException as e:
-            write_log('error', "downloadFile "+str(e))
+            write_error( "error: download file, " + str(e) )
         except IOError as e:
-            write_log('error', "downloadFile "+str(e))
+            write_error( "error: download file, " + str(e) )
         finally:
             sftpClient.close()
     
@@ -150,19 +151,16 @@ class Ssh( object ):
 
             self.chan = self.clt.invoke_shell(term='xterm', width=self.size[0], height=self.size[1])
         except socket.error as e:
-            write_log('error', "login: "+str(e))
             ret['status'] = False
             ret['msg'] = u'连接ssh服务器失败。请检查主机和端口。'
         except paramiko.BadHostKeyException as e:
-            write_log('error', "login: "+str(e))
             ret['status'] = False
             ret['msg'] = u'错误的密钥文件。'
         except paramiko.AuthenticationException as e:
-            write_log('error', "login: "+str(e))
             ret['status'] = False
             ret['msg'] = u'用户名或密码错误。'
         except paramiko.SSHException as e:
-            write_log('error', "login: "+str(e))
+            write_error( "error: link ssh server fail, " + str(e) )
             ret['status'] = False
             ret['msg'] = u'在连接ssh服务器的时候发生一个未知错误。'
         return ret
@@ -171,11 +169,14 @@ class Ssh( object ):
         data = ''
         commandList = list()
         command = ''
+        self.select_list.append(self.chan)
+        self.select_list.append(ws.webSock)
         while 1:
-            r,w,e = select.select([self.chan, ws.webSock], [], [])
+            r,w,e = select.select(self.select_list, [], [])
             if self.chan in r:
                 try:
                     data += self.chan.recv(1024)
+                    if len(data) == 0: break
                     _x = paramiko.py3compat.u(data)
                 except UnicodeDecodeError:
                     continue
@@ -183,11 +184,11 @@ class Ssh( object ):
                     pass
                 else:
                     data = ''
-                    if len( _x ) == 0: break
                     _resMes = json.dumps({'response': 'data', 'data': _x})
                     ws.sendMessage(_resMes)
             if ws.webSock in r:
                 recvData = ws.recvMessage
+                # print recvData
                 if recvData['request'] == 'resize':
                     self.chan.resize_pty(width=recvData['cols'], height=recvData['rows'])
                 elif recvData['request'] == 'upload' and recvData['data'] != '':
@@ -200,10 +201,12 @@ class Ssh( object ):
                     ws.sendMessage(json.dumps({'response': 'data', 'data': '\r\n'}))
                     self.downloadFile(recvData['data'])
                     self.chan.sendall('\r')
+                elif recvData['request'] == 'quit':
+                    # 用户选择退出
+                    break
                 else:
                     _x = recvData['data']
                     self.chan.send(_x)
-            ws.data = ''
 
     @classmethod
     def genKeys(self, _key_json):
@@ -228,12 +231,12 @@ class Ssh( object ):
                 key.write_private_key(privateFp)
             else:
                 key.write_private_key(privateFp, password=str.encode(_key_json['password'].encode()))
-        except IOError:
-            write_log('error', 'genKeys: there was an error writing to the file')
+        except IOError as e:
+            write_error( "error: gen key, " + str(e) )
             ret['status'] = False
             ret['mes'] = 'there was an error writing to the file'
         except paramiko.SSHException:
-            write_log('error', 'genKeys: there was an error writing to the file')
+            write_error( "error: gen key, " + str(e) )
             ret['status'] = False
             ret['mes'] = 'the key is invalid'
         else:
@@ -266,10 +269,11 @@ class WebSocket( threading.Thread ):
         self.handshaken = False
         threading.Thread.__init__(self)
 
-    def __del__(self):
+    def destroy(self):
         try:
+            self.webSock.shutdown(socket.SHUT_RDWR)
             self.webSock.close()
-            del self.ssh
+            self.ssh.destroy()
         except:
             pass
 
@@ -305,7 +309,7 @@ class WebSocket( threading.Thread ):
         raw_str = ''  
 
         for d in data:  
-            raw_str += chr(ord(d) ^ ord(masks[i%4]))  
+            raw_str += chr(ord(d) ^ ord(masks[i%4]))
             i += 1  
         return raw_str
 
@@ -361,7 +365,7 @@ class WebSocket( threading.Thread ):
             data=''
         )
         self.data += self.webSock.recv(128)
-        if len(self.data) <= 0:
+        if len(self.data) == 0:
             _buffer_json['request'] = 'quit'
             _buffer_json['data'] = ''
         else:
@@ -371,8 +375,10 @@ class WebSocket( threading.Thread ):
             _buffer_unicode = str( _buffer_utf8 ).decode('utf8','ignore')
             try:
                 _buffer_json = json.loads(_buffer_utf8)
-            except ValueError:
+            except:
                 pass
+            else:
+                self.data = ''
         return _buffer_json
 
     def session(self, recvMes):
@@ -389,10 +395,11 @@ class WebSocket( threading.Thread ):
             self.sendMessage(_resMes)
             # 登录成功 进行会话
             self.ssh.session(self)
+            write_error( 'session end.' )
             # 会话结束
             _resMes = json.dumps({'response': 'logout'})
             self.sendMessage(_resMes)
-            self.ssh = None
+            self.ssh.destroy()
 
     def genKey(self, _key_json):
         _resMes = ''
@@ -404,9 +411,12 @@ class WebSocket( threading.Thread ):
         return self.sendMessage(_resMes)
 
     def run(self):
+        global pid
         while True:
             if not self.handshaken:
                 self.handShake()
+                # 不是webSocket
+                if not self.handshaken: break
             else:
                 _buffer_json = self.recvMessage
                 if _buffer_json['request'] == 'init':
@@ -416,41 +426,60 @@ class WebSocket( threading.Thread ):
                 elif _buffer_json['request'] == 'quit':
                     break
                 elif _buffer_json['request'] == 'systemExit':
-                    try:
-                        os.remove(parent_path+'/../temp.exe')
-                    except: pass
-                    os.kill(pid, signal.SIGILL)
+                    os.kill(pid, signal.SIGTERM)
                 elif _buffer_json['request'] == '':
                     continue
                 else:
                     break
                 self.data = ''
+        self.destroy()
 
 class WebSocketServer( object ):
+    __instance = None
+    __is_run = True
+
     def __init__(self):
         self.sock = None
+        
+    def __del__(self):
+        self.sock.close()
+
+    def __new__(self, *args, **kwargs):
+        if not self.__instance:
+            self.__instance = object.__new__(self, *args, **kwargs)
+        return self.__instance
 
     def start(self):
         try:
             self.sock = socket.socket( socket.AF_INET, socket.SOCK_STREAM )
-            self.sock.setsockopt( socket.SOL_SOCKET,socket.SO_REUSEADDR,1 )
+            self.sock.setsockopt( socket.SOL_SOCKET, socket.SO_REUSEADDR, 1 )
             self.sock.bind(( '', 12345 ))
             self.sock.listen(1)
         except socket.error:
-            write_log('error', 'open WebSocketServer error.')
+            write_error( "fatal error: create socket fail." )
             sys.exit(1)
-        while True:
+        while self.__is_run:
             conn, addr = self.sock.accept()
-            clientIp = addr[0]
-            webSocketClient = WebSocket( conn, clientIp )
+            webSocketClient = WebSocket( conn, addr[0] )
             webSocketClient.start()
 
-def systemExit(a, b):
-    # webSocketClient 发送终止信号
-    sys.exit(0)
+    @classmethod
+    def systemExit(self, signo, frame):
+        # 终止信号 貌似在windows上不管用
+        os.remove(parent_path+'/../~smileShell.exe')
+        self.__is_run = False
+
+def init_environment():
+    global err_fd
+    
+    if not os.path.exists(log_path):
+        os.mkdir( log_path )
+
+    err_fd = open( "%s/err_%s.log"%(log_path, time.strftime("%Y-%m-%d")), 'wb' )
 
 if __name__ == "__main__":
-    pid = os.getpid()
-    signal.signal(signal.SIGILL, systemExit)
+    init_environment()
+    write_error( "pid: %d" %(pid, ) )
+    signal.signal(signal.SIGTERM, WebSocketServer.systemExit)
     wss = WebSocketServer()
     wss.start()
