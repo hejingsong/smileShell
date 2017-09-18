@@ -169,6 +169,8 @@ class Ssh( object ):
         data = ''
         commandList = list()
         command = ''
+        self.chan.setblocking(False)
+        ws.webSock.setblocking(False)
         self.select_list.append(self.chan)
         self.select_list.append(ws.webSock)
         while 1:
@@ -194,12 +196,16 @@ class Ssh( object ):
                 elif recvData['request'] == 'upload' and recvData['data'] != '':
                     # 上传文件
                     ws.sendMessage(json.dumps({'response': 'data', 'data': '\r\n'}))
+                    self.chan.setblocking(True)
                     self.uploadFile(recvData['data'])
+                    self.chan.setblocking(False)
                     self.chan.sendall('\r')
                 elif recvData['request'] == 'download' and recvData['data'] != '':
                     # 下载文件
                     ws.sendMessage(json.dumps({'response': 'data', 'data': '\r\n'}))
+                    self.chan.setblocking(True)
                     self.downloadFile(recvData['data'])
+                    self.chan.setblocking(False)
                     self.chan.sendall('\r')
                 elif recvData['request'] == 'quit':
                     # 用户选择退出
@@ -207,6 +213,7 @@ class Ssh( object ):
                 else:
                     _x = recvData['data']
                     self.chan.send(_x)
+        ws.webSock.setblocking(True)
 
     @classmethod
     def genKeys(self, _key_json):
