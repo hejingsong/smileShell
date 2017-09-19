@@ -80,19 +80,28 @@ class Ssh( object ):
             pass
 
     def getCurrentPath(self):
-        self.select_list.remove(self.chan)
+        data = ''
+        recvData = ''
         try:
+            self.chan.setblocking(True)
             self.chan.sendall('\x15pwd\r')
-            recvData = self.chan.recv(1024)
-            if len(recvData) == 0: return '~'
+            while 1:
+                data = self.chan.recv(1)
+                recvData += data
+                if data == '$' or data == '#':
+                    break
+            if len(recvData) == 0:
+                return '~'
             currentPath = self.handler.findall(recvData)
-            if len(currentPath) == 0: return '~'
-            else: return currentPath[0]
+            if len(currentPath) == 0:
+                return'~'
+            else: 
+                return currentPath[0]
         except:
-            write_error(  "error: rz/sz pwd fail." )
+            write_error( "error: rz/sz." )
             return '~'
         finally:
-            self.select_list.append(self.chan)
+            self.chan.setblocking(False)
 
     def uploadFile(self, fileName):
         remote_path = self.getCurrentPath()
@@ -110,16 +119,22 @@ class Ssh( object ):
     def downloadFile(self, fileName):
         get_user_setting_path()
         remotePath = self.getCurrentPath()
-        remoteFile = remotePath + '/' + fileName
+        remoteFile = ''
+        if fileName[0] == '/':
+            remoteFile = fileName
+        else:
+            remoteFile = remotePath + '/' + fileName.strip()
+        fileName = fileName.split('/')[-1]
+        write_error( "downloadFile: " + remoteFile)
         if not os.path.exists(download_path):
             os.mkdir(download_path, 0755)
         try:
             sftpClient = paramiko.SFTPClient.from_transport(self.clt.get_transport())
             sftpClient.get(remoteFile, download_path+'/'+fileName)
         except paramiko.SSHException as e:
-            write_error( "error: download file, " + str(e) )
+            write_error( "sftp error: download file, " + str(e) )
         except IOError as e:
-            write_error( "error: download file, " + str(e) )
+            write_error( "localIO error: download file, " + str(e) )
         finally:
             sftpClient.close()
     
@@ -196,16 +211,12 @@ class Ssh( object ):
                 elif recvData['request'] == 'upload' and recvData['data'] != '':
                     # 上传文件
                     ws.sendMessage(json.dumps({'response': 'data', 'data': '\r\n'}))
-                    self.chan.setblocking(True)
                     self.uploadFile(recvData['data'])
-                    self.chan.setblocking(False)
                     self.chan.sendall('\r')
                 elif recvData['request'] == 'download' and recvData['data'] != '':
                     # 下载文件
                     ws.sendMessage(json.dumps({'response': 'data', 'data': '\r\n'}))
-                    self.chan.setblocking(True)
                     self.downloadFile(recvData['data'])
-                    self.chan.setblocking(False)
                     self.chan.sendall('\r')
                 elif recvData['request'] == 'quit':
                     # 用户选择退出
