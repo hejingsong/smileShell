@@ -100,8 +100,6 @@ class Ssh( object ):
         except:
             write_error( "error: rz/sz." )
             return '~'
-        finally:
-            self.chan.setblocking(False)
 
     def uploadFile(self, fileName):
         remote_path = self.getCurrentPath()
@@ -184,8 +182,6 @@ class Ssh( object ):
         data = ''
         commandList = list()
         command = ''
-        self.chan.setblocking(False)
-        ws.webSock.setblocking(False)
         self.select_list.append(self.chan)
         self.select_list.append(ws.webSock)
         while 1:
@@ -224,7 +220,6 @@ class Ssh( object ):
                 else:
                     _x = recvData['data']
                     self.chan.send(_x)
-        ws.webSock.setblocking(True)
 
     @classmethod
     def genKeys(self, _key_json):
@@ -282,6 +277,7 @@ class WebSocket( threading.Thread ):
         self.path = path
         self.ssh = None
         self.data = ''
+        self.data_len = 0
         self.code_length = 0
         self.headers_length = 0
         self.handshaken = False
@@ -295,15 +291,18 @@ class WebSocket( threading.Thread ):
         except:
             pass
 
-    def get_data_length(self, data):
-        ''' 获取接受数据的长度 '''
-        self.code_length = ord(data[1]) & 127
-        received_length = 0
+    def get_data_length(self, msg):
+        # 获取接受数据的长度
+        global g_header_length    
+        
+        # print (len(msg))
+        self.code_length = ord(msg[1]) & 127
+        received_length = 0;
         if self.code_length == 126:
-            self.code_length = struct.unpack('>H', str(data[2:4]))[0]
+            self.code_length = struct.unpack('>H', str(msg[2:4]))[0]
             self.headers_length = 8
         elif self.code_length == 127:
-            self.code_length = struct.unpack('>Q', str(data[2:10]))[0]
+            self.code_length = struct.unpack('>Q', str(msg[2:10]))[0]
             self.headers_length = 14
         else:
             self.headers_length = 6
@@ -324,32 +323,63 @@ class WebSocket( threading.Thread ):
             masks = data[2:6]
             data = data[6:]
         i = 0  
-        raw_str = ''  
+        raw_str = ''
 
         for d in data:  
             raw_str += chr(ord(d) ^ ord(masks[i%4]))
             i += 1  
         return raw_str
 
-    def sendMessage(self, msg):
-        _msg_utf8 = msg.encode('utf8')
-        _msg_length = len( _msg_utf8 )
-        _back_str = ''
-        _back_str += '\x81'
+    def parse_data(self, msg):
+        self.code_length = ord(msg[1]) & 127
+        received_length = 0;
+        if self.code_length == 126:
+            self.code_length = struct.unpack('>H', str(msg[2:4]))[0]
+            masks = msg[4:8]
+            data = msg[8:]
+        elif self.code_length == 127:
+            self.code_length = struct.unpack('>Q', str(msg[2:10]))[0]
+            masks = msg[10:14]
+            data = msg[14:]
+        else:
+            masks = msg[2:6]
+            data = msg[6:]
 
-        if _msg_length <= 125:  
-            _back_str += chr(_msg_length)
-        elif _msg_length <= 65535 :  
-            _back_str += struct.pack('b', 126) 
-            _back_str += struct.pack('>h', _msg_length)
-        elif _msg_length <= (2**64-1):
-            _back_str += struct.pack('b', 127)
-            _back_str += struct.pack('>q', _msg_length)
-        else :  
+        i = 0
+        raw_str = ''
+
+        for d in data:
+            raw_str += chr(ord(d) ^ ord(masks[i%4]))
+            i += 1
+
+        return raw_str 
+
+    def sendMessage(self, msg):
+        # 发送字符串
+        message = msg.encode('utf-8')
+        back_str = []
+        back_str.append('\x81')
+        data_length = len(message)
+
+        if data_length <= 125:
+            back_str.append(chr(data_length))
+        elif data_length <= 65535 :
+            back_str.append(struct.pack('b', 126))
+            back_str.append(struct.pack('>h', data_length))
+        elif data_length <= (2^64-1):
+            back_str.append(struct.pack('b', 127))
+            back_str.append(struct.pack('>q', data_length))
+        else:
             pass
-        _back_str += _msg_utf8
-        if _back_str != None and len(_back_str) > 0:
-            self.webSock.send(_back_str)
+        
+        data = ''
+        for c in back_str:
+            data += c
+
+        back_str = str(data) + message
+
+        if back_str != None and len(back_str) > 0:
+            self.webSock.send(back_str)
 
     def handShake(self):
         _recv_buffer = ''
@@ -378,25 +408,33 @@ class WebSocket( threading.Thread ):
         _recv_buffer = ''
         _buffer_utf8 = ''
         _buffer_unicode = ''
+        tmp_data = ''
         _buffer_json = dict(
             request='',
             data=''
         )
-        self.data += self.webSock.recv(128)
+        tmp_data = self.webSock.recv(128)
+        if len(tmp_data) <= 0:
+            return _buffer_json
+        if self.code_length == 0:
+            self.get_data_length(tmp_data)
+
+        self.data_len += len(tmp_data)
+        self.data += tmp_data
+        if self.data_len - self.headers_length < self.code_length:
+            return _buffer_json
+        else:
+            _buffer_utf8 = self.parse_data(self.data)
+            _buffer_unicode = str(_buffer_utf8).decode('utf-8', 'ignore')
         if len(self.data) == 0:
             _buffer_json['request'] = 'quit'
             _buffer_json['data'] = ''
         else:
-            _buffer_length += len( self.data )
-            _recv_buffer += self.data
-            _buffer_utf8 = self.parse_data( _recv_buffer )
-            _buffer_unicode = str( _buffer_utf8 ).decode('utf8','ignore')
-            try:
-                _buffer_json = json.loads(_buffer_utf8)
-            except:
-                pass
-            else:
-                self.data = ''
+            _buffer_json = json.loads(_buffer_unicode)
+
+        self.data = ''
+        self.code_length = 0
+        self.data_len = 0
         return _buffer_json
 
     def session(self, recvMes):
