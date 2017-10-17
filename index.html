@@ -2420,11 +2420,11 @@ img.nav-close:hover {background-color:red;}
             <li class='setting' title='设置'></li>
             <li class='key' title='生成sshKey'></li>
             <!-- debug -->
-            <!-- <li class='reload' title='reload'></li> -->
+            <li class='reload' title='reload'></li>
         </ul>
     </div>
     <div class='logo'></div>
-    <!-- develop -->
+    <!-- 开发的时候使用这里的.js文件 下面的bin文件是有js编译而成的 -->
     <script src='static/js/jquery.min.js'></script>
     <script src='static/js/xterm.js'></script>
     <script src='static/js/fit.js'></script>
@@ -2432,10 +2432,12 @@ img.nav-close:hover {background-color:red;}
     <script src='static/js/script.js'></script>
 </body>
 </html>
-<!-- <script>
+<!-- 这里只有在正式环境才使用这里的bin文件
+<script>
     nw.Window.get().evalNWBin(null, './bin/jquery.bin');
     nw.Window.get().evalNWBin(null, './bin/xterm.bin');
     nw.Window.get().evalNWBin(null, './bin/fit.bin');
     nw.Window.get().evalNWBin(null, './bin/simpleTree.bin');
     nw.Window.get().evalNWBin(null, './bin/script.bin');
-</script> -->
+</script>
+-->

@@ -35,10 +35,10 @@ if ( typeof(require) != 'undefined' ) {
     dataFile = baseDir+'/data/'+hostname+'.dat';
     confFile = baseDir+'/data/'+hostname+'.conf';
     clipboard = gui.Clipboard.get();
-    // 打开webSocketServer
+    // 打开webSocketServer 在测试环境中执行python main.py
     shell.openItem(baseDir+'/bin/webSocketServer.exe');
     // debug
-    // win.showDevTools();
+    win.showDevTools();
     // debug end
 }
 
@@ -856,7 +856,13 @@ function createConnectBox() {
         $webClient.open();
         wscArray.push($webClient);
         // close the quick connect box
+        closeDiv($connBox);
         closeDiv($fullBox);
+        // hide list
+        hiddenList();
+        // focus term
+        $webClient.focus();
+
     });
     $falseBtn.bind('click', function () {closeDiv($connBox);closeDiv($fullBox);});
     // 显示
@@ -1026,7 +1032,9 @@ $(document).ready(function () {
     $('.show-btn').bind('click', showList);
     $('.conn').bind('click', createConnectBox);
     $('.folder').bind('click', function () { $folder.createFolderList(); });
-    // $('.reload').bind('click', function () { win.reload(); });
+    /***** Debug *****/
+    $('.reload').bind('click', function () { win.reload(); });
+    /***** end Debug *****/
     $('.setting').bind('click', function () {
         var $set = new Setting();
     });
