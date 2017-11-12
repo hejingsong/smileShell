@@ -1,0 +1,9 @@
+*.pyc
+*.bin
+log/
+data/
+download/
+conf/
+sshKey/
+static/
+production/

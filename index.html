@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>smileShell</title>
-    <link rel="shortcut icon" href="./img/icon.png">
+    <title>SmileShell</title>
+    <link rel="shortcut icon" href="./static/img/icon.png">
     <style>
 /*reset.css*/
 html, body, div, span, applet, object, iframe,
-h1, h2, h3, h4, h5, h6, p, blockquote, pre,
+h1, h2, h3, h4, h5, h6, p, blocSkquote, pre,
 a, abbr, acronym, address, big, cite, code,
 del, dfn, em, img, ins, kbd, q, s, samp,
 small, strike, strong, sub, sup, tt, var,
@@ -68,7 +68,7 @@ table {
     line-height:18px; 
     cursor:default;
     list-style:none; 
-    background:url(img/st_node.gif); 
+    background:url(static/img/st_node.gif); 
     background-repeat:no-repeat; 
     padding:0 5px 0px 20px;
     margin-bottom: 5px;
@@ -84,24 +84,26 @@ table {
 
 /* 子菜单的父节点 */
 .folder-content .folder{ 
-    list-style-image:url(img/st_icon.png); 
-    background:url(img/st_folder.gif); 
+    list-style-image:url(static/img/st_icon.png); 
+    background:url(static/img/st_folder.gif); 
     background-repeat:no-repeat; 
     padding:0 0 0 20px; 
 }
 
 /* 展开的父节点 */
 .folder-content .open{ 
-    list-style-image:url(img/st_icon_open.png); 
-    background:url(img/st_folder_open.gif); 
+    list-style-image:url(static/img/st_icon_open.png); 
+    background:url(static/img/st_folder_open.gif); 
     background-repeat:no-repeat; 
     padding:0 0 0 20px; 
 }
 
-.folder-content .hover{
+.folder-content ul li:hover{
     background-color:#222;
     color: #ccc;
 }
+
+#currentNode {background-color: orange;color:black;}
 /*xterm.css*/
 
 .terminal {
@@ -2319,7 +2321,7 @@ table {
 /*style.css*/
 @keyframes loading {50% {-webkit-transform: rotate(180deg);}100% {-webkit-transform: rotate(360deg);}}
 body {background-color: #444;cursor: default;overflow: hidden;}
-.conn-nav {display: none;height: 32px;margin-top: 3px; background:#444; color:white;overflow:auto;}
+.conn-nav {display: none;height: 32px; background:#444; color:white;overflow:auto;}
 .conn-nav div {display: inline-block;height: inherit;background:gray;margin-right: 1px;border-radius: 10px 10px 0px 0px;padding: 0px 5px;}
 .conn-nav #current-nav {background: #222; box-shadow: 0px 0px 10px #000 inset; border-left: 1px #000 solid; border-right: 1px #000 solid;}
 .conn-nav img {height:12px;width:12px; margin-top: 10px;border-radius: 50px;}
@@ -2329,49 +2331,44 @@ body {background-color: #444;cursor: default;overflow: hidden;}
 .conn-nav::-webkit-scrollbar-thumb:hover{background-color: #222;box-shadow: 0px 0px 5px #000 inset;}
 img.nav-close:hover {background-color:red;}
 .load {-webkit-animation: loading .5s infinite;}
-#currentNode {background-color: orange;color:black;}
-#term-box {position: absolute; top:60px;left: 0px; right: 0px;bottom: 0px;}
+#term-box {position: absolute; top:55px;left: 0px; right: 0px;bottom: 0px;}
 #term-box > div {position: absolute;top: 0px;left: 0px; right: 0px;bottom: 0px;}
-.show-btn {position: absolute; top: 60px;right:20px;height: 32px; width: 32px; background: url(img/list.png); transition: transform .3s;z-index:5;}
-.right-nav {display: none;position: absolute; top: 100px;right: 5px; height: 100px; width: 50px;transition: transform .3s;z-index:5;}
+.show-btn {position: absolute; top: 60px;right:20px;height: 32px; width: 32px; background: url(static/img/list.png); transition: transform .3s;z-index:5;}
+.right-nav {transform: translateX(60px); position: absolute; top: 100px;right: 5px; height: 100px; width: 50px;transition: transform .3s;z-index:5;}
 .right-nav li {height: 32px; width: 35px; margin-bottom: 20px;-webkit-transition: transform .3s;}
 .right-nav li:hover {transform: translateY(-10%);}
-.conn {background:url(img/connect.png) no-repeat;}
-.folder {background: url(img/folder.png) no-repeat;}
-.setting {background: url(img/setting.png) no-repeat;}
-.key {background: url(img/key.png) no-repeat;}
-.reload {background: url(img/reload.png) no-repeat;}
+#conn {background:url(static/img/connect.png) no-repeat;}
+#folder {background: url(static/img/folder.png) no-repeat;}
+#setting {background: url(static/img/setting.png) no-repeat;}
+#key {background: url(static/img/key.png) no-repeat;}
+#reload {background: url(static/img/reload.png) no-repeat;}
 .full-box {position: fixed;top: 0px; bottom: 0px; left: 0px; right:0px;background: rgba(128,128,128,0.5);z-index: 6;}
-.conn-box,.error-box,.folder-box,.new-box,.modify-box,.setting-box,.private-box {position: absolute;top: 0px;left: 30%;z-index: 11;user-select: none;}
-.conn-header,.error-header,.folder-header,.new-header,.modify-header,.setting-header,.private-header {line-height: 32px;height: 32px;width: 500px;margin: 100px auto;padding: 0px 10px; border-radius: 5px 5px 0px 0px;color:white;background: #333;}
-.conn-header img,.error-header img,.folder-header img,.new-header img,.modify-header img,.setting-header img,.private-header img {height:15px;width: 15px;border-radius: 50px;margin-top: 8px;float: right;}
-.conn-header img:hover, .error-header img:hover,.folder-header img:hover,.new-header img:hover,.modify-header img:hover,.setting-header img:hover,.private-header img:hover {background: red;}
-.conn-content,.error-content,.folder-content,.new-content,.modify-content,.setting-content,.private-content {margin: -100px auto; border-top: 1px solid #555;background: #444;width: 500px; padding: 10px;}
+.conn-box,.error-box,.folder-box,.new-box,.modify-box,.setting-box,.private-box,.msg-box {position: absolute;top: 0px;left: 30%;z-index: 11;user-select: none;}
+.conn-header,.error-header,.folder-header,.new-header,.modify-header,.setting-header,.private-header,.msg-header {line-height: 32px;height: 32px;width: 500px;margin: 100px auto;padding: 0px 10px; border-radius: 5px 5px 0px 0px;color:white;background: #333;}
+.conn-header img,.error-header img,.folder-header img,.new-header img,.modify-header img,.setting-header img,.private-header img,.msg-header img {height:15px;width: 15px;border-radius: 50px;margin-top: 8px;float: right;}
+.conn-header img:hover, .error-header img:hover,.folder-header img:hover,.new-header img:hover,.modify-header img:hover,.setting-header img:hover,.private-header img:hover,.msg-header img:hover {background: red;}
+.conn-content,.error-content,.folder-content,.new-content,.modify-content,.setting-content,.private-content,.msg-content {margin: -100px auto; border-top: 1px solid #555;background: #444;width: 500px; padding: 10px;}
 .host-info input[name="host"] {display: inline-block;width: 150px;margin-right:28px;}
 .host-info input[name='port'] {display: inline-block;width: 50px;}
 .login-type {text-align: center;color:white;}
 .login-type input[type="radio"] {display: inline;width:auto;height:auto;box-shadow: none;margin-left: 10px;}
-.error-content{color: red; text-align: center;font-weight:bold;}
 .folder-content-btn{text-align: center;}
 .folder-content-btn img {width: 25px;height:25px;margin-right: 10px;}
 .folder-content-btn img:hover {background:#111;box-shadow: 0px 0px 2px #000 inset;}
-.conn-content input,.new-content input,.modify-content input,.setting-content input,.private-content input {
+.conn-content input,.new-content input,.modify-content input,.setting-content input,.private-content input,.msg-content input {
     display: block;height: 32px;width: 250px;margin: 10px auto;
     border-radius: 5px;outline:none;border: 1px solid #ccc;
     box-shadow:0px 0px 2px #ccc inset;background:white;
     padding: 0px 10px;
 }
-.conn-content input:focus,.new-content input:focus,.modify-content input:focus,.setting-content input:focus,.private-content input:focus{box-shadow:0px 0px 5px #5675B9 inset}
+.conn-content input:focus,.new-content input:focus,.modify-content input:focus,.setting-content input:focus,.private-content input:focus, .msg-content input:focus{box-shadow:0px 0px 5px #5675B9 inset}
 .conn-btn,.new-btn,.mod-btn,.setting-btn,.private-btn {text-align: center; margin-top: 10px;}
 .conn-btn button,.new-btn button,.mod-btn button,.setting-btn button,.private-btn button {height: 32px;width: 50px;margin-right: 10px;background:transparent;border: none;color: white;border-radius:5px;padding:2px 5px;}
 .conn-btn button:hover,.new-btn button:hover,.mod-btn button:hover,.setting-btn button:hover,.private-btn button:hover{background:#222;box-shadow: 0px 0px 2px #000 inset;}
 .host-info{text-align: center;}
 .keyTypeBox { text-align: left; color: white; width: 270px; margin: 0px auto 20px auto;}
 .keyTypeBox select {margin-left: 40px;}
-.logo {height: 130px; width: 130px; margin: 150px auto; background:url('img/icon.png') no-repeat;}
-.contextMenu {position: fixed; border-radius: 2px; font-size: 15px;color: white; background-color:#333;z-index: 15;}
-.contextMenu li {height: 30px; line-height:30px;margin-bottom: 5px;padding: 0px 10px;}
-.contextMenu li:hover{background-color: #222;box-shadow: 0px 0px 5px #111 inset;}
+.logo {height: 130px; width: 130px; margin: 150px auto; background:url('static/img/icon.png') no-repeat;}
 *::-webkit-scrollbar{width: 16px;height: 16px;background-color: #555;border-radius:5px;}  
 *::-webkit-scrollbar-track{-webkit-box-shadow: inset 0 0 6px #444;border-radius: 5px;background-color: #555;}  
 *::-webkit-scrollbar-thumb{border-radius: 10px;background-color: #333;}
@@ -2382,12 +2379,12 @@ img.nav-close:hover {background-color:red;}
 .app-logo {float:left;margin-left:10px;}
 .app-logo img {height:18px;margin-top:2px;}
 .app-logo span{color: #ccc;position: relative;top: -25px;left: 25px;}
-.app-min {background: url(img/app-min.png) no-repeat;}
-.app-min:hover {background: url(img/app-min-hover.png) no-repeat;}
-.app-max {background: url(img/app-max.png) no-repeat;}
-.app-max:hover {background: url(img/app-max-hover.png) no-repeat;}
-.app-close {background: url(img/app-close.png) no-repeat;}
-.app-close:hover {background: url(img/app-close-hover.png) no-repeat;}
+.app-min {background: url(static/img/app-min.png) no-repeat;}
+.app-min:hover {background: url(static/img/app-min-hover.png) no-repeat;}
+.app-max {background: url(static/img/app-max.png) no-repeat;}
+.app-max:hover {background: url(static/img/app-max-hover.png) no-repeat;}
+.app-close {background: url(static/img/app-close.png) no-repeat;}
+.app-close:hover {background: url(static/img/app-close-hover.png) no-repeat;}
 .box-left, .box-bottom, .box-right {position: absolute;background:#ccc;}
 .box-left {left:0px;top:22px;bottom:0px;width:3px;}
 .box-bottom{left:0px;right:0px;bottom:0px;height:3px;}
@@ -2396,13 +2393,20 @@ img.nav-close:hover {background-color:red;}
 #term-box div::selection, #term-box span::selection { background-color: orange; color:white;}
 .select-box input {margin: 0px auto;}
 .select-box button { display: inline; position: relative; top: -30px; left: 400px; border: 2px solid yellow; background: #444; border-radius: 5px; color: white; }
+.select-btn { display: inline; position: relative; top: -39px; left: 395px; border: 2px solid yellow; background-color: #444; border-radius: 5px; color: white;}
+#mycontentmenu{ position:fixed; background:#f1f1f1; padding:2px; box-shadow:2px 2px 2px rgba(0, 0, 0, .6); width:180px; overflow:hidden; z-index: 1; }
+#mycontentmenu li { height:24px; cursor:default; line-height:24px; white-space:nowrap; padding:0 30px; width:100%; user-select: none; }
+#mycontentmenu li:hover { background:#E6EDF6; box-shadow: 0px 0px 1px #729fcf inset; }
+/*#mycontentmenu {position: fixed; border-radius: 2px; font-size: 15px;color: white; background-color:#333;z-index: 15;}
+#mycontentmenu li {height: 30px; line-height:30px;margin-bottom: 5px;padding: 0px 10px;}
+#mycontentmenu li:hover{background-color: #222;box-shadow: 0px 0px 5px #111 inset;}*/
     </style>
 </head>
 <body>
     <div class='box-top'>
         <div class='app-logo'>
-            <img src="./img/icon.png">
-            <span>smileShell</span>
+            <img src="static/img/icon.png">
+            <span>SmileShell</span>
         </div>
         <div class='app-min'></div>
         <div class='app-max'></div>
@@ -2415,29 +2419,26 @@ img.nav-close:hover {background-color:red;}
     <div class='show-btn' title='展开列表'></div>
     <div class='right-nav'>
         <ul>
-            <li class='conn' title='快速连接'></li>
-            <li class='folder' title='连接列表'></li>
-            <li class='setting' title='设置'></li>
-            <li class='key' title='生成sshKey'></li>
+            <li id='conn' class='menu' title='快速连接'></li>
+            <li id='folder' class='menu' title='连接列表'></li>
+            <li id='setting' class='menu' title='设置'></li>
+            <li id='key' class='menu' title='生成sshKey'></li>
             <!-- debug -->
-            <li class='reload' title='reload'></li>
+            <li id='reload' class='menu' title='reload'></li>
         </ul>
     </div>
+
     <div class='logo'></div>
     <!-- 开发的时候使用这里的.js文件 下面的bin文件是有js编译而成的 -->
-    <script src='static/js/jquery.min.js'></script>
-    <script src='static/js/xterm.js'></script>
-    <script src='static/js/fit.js'></script>
-    <script src='static/js/simpleTree.js'></script>
-    <script src='static/js/script.js'></script>
+    <!-- <script src='static_dev/js/xterm.js'></script> -->
+    <!-- <script src='static_dev/js/fit.js'></script> -->
+    <!-- <script src='static_dev/js/script.js'></script> -->
 </body>
 </html>
-<!-- 这里只有在正式环境才使用这里的bin文件
+ 
 <script>
-    nw.Window.get().evalNWBin(null, './bin/jquery.bin');
-    nw.Window.get().evalNWBin(null, './bin/xterm.bin');
-    nw.Window.get().evalNWBin(null, './bin/fit.bin');
-    nw.Window.get().evalNWBin(null, './bin/simpleTree.bin');
-    nw.Window.get().evalNWBin(null, './bin/script.bin');
+    // 这里只有在正式环境才使用这里的bin文件
+    nw.Window.get().evalNWBin(null, './static/bin/xterm.bin');
+    nw.Window.get().evalNWBin(null, './static/bin/fit.bin');
+    nw.Window.get().evalNWBin(null, './static/bin/script.bin');
 </script>
--->
