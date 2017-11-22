@@ -5,14 +5,132 @@ var wsc = null;             // WebsocketClient的实例化
 var folderList = null;      // 连接列表实例
 var try_conn = 0;           // 尝试连接后端WebSocketServer次数
 var max_try = 10;           // 最大尝试连接次数
+var dataDir = '';           // 保存用户数据文件夹
+var dataFile = '';          // 用户保存的数据
 var down_dir = '';          // 下载文件保存路径
 var key_dir = '';           // sshKey保存路径
+
+
+/**
+*
+*  Base64 encode / decode
+*
+*  @author haitao.tu
+*  @date   2010-04-26
+*  @email  tuhaitao@foxmail.com
+*
+*/
+function Base64() {
+ 
+    // private property
+    _keyStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=";
+ 
+    // public method for encoding
+    this.encode = function (input) {
+        var output = "";
+        var chr1, chr2, chr3, enc1, enc2, enc3, enc4;
+        var i = 0;
+        input = _utf8_encode(input);
+        while (i < input.length) {
+            chr1 = input.charCodeAt(i++);
+            chr2 = input.charCodeAt(i++);
+            chr3 = input.charCodeAt(i++);
+            enc1 = chr1 >> 2;
+            enc2 = ((chr1 & 3) << 4) | (chr2 >> 4);
+            enc3 = ((chr2 & 15) << 2) | (chr3 >> 6);
+            enc4 = chr3 & 63;
+            if (isNaN(chr2)) {
+                enc3 = enc4 = 64;
+            } else if (isNaN(chr3)) {
+                enc4 = 64;
+            }
+            output = output +
+            _keyStr.charAt(enc1) + _keyStr.charAt(enc2) +
+            _keyStr.charAt(enc3) + _keyStr.charAt(enc4);
+        }
+        return output;
+    }
+ 
+    // public method for decoding
+    this.decode = function (input) {
+        var output = "";
+        var chr1, chr2, chr3;
+        var enc1, enc2, enc3, enc4;
+        var i = 0;
+        input = input.replace(/[^A-Za-z0-9\+\/\=]/g, "");
+        while (i < input.length) {
+            enc1 = _keyStr.indexOf(input.charAt(i++));
+            enc2 = _keyStr.indexOf(input.charAt(i++));
+            enc3 = _keyStr.indexOf(input.charAt(i++));
+            enc4 = _keyStr.indexOf(input.charAt(i++));
+            chr1 = (enc1 << 2) | (enc2 >> 4);
+            chr2 = ((enc2 & 15) << 4) | (enc3 >> 2);
+            chr3 = ((enc3 & 3) << 6) | enc4;
+            output = output + String.fromCharCode(chr1);
+            if (enc3 != 64) {
+                output = output + String.fromCharCode(chr2);
+            }
+            if (enc4 != 64) {
+                output = output + String.fromCharCode(chr3);
+            }
+        }
+        output = _utf8_decode(output);
+        return output;
+    }
+ 
+    // private method for UTF-8 encoding
+    _utf8_encode = function (string) {
+        string = string.replace(/\r\n/g,"\n");
+        var utftext = "";
+        for (var n = 0; n < string.length; n++) {
+            var c = string.charCodeAt(n);
+            if (c < 128) {
+                utftext += String.fromCharCode(c);
+            } else if((c > 127) && (c < 2048)) {
+                utftext += String.fromCharCode((c >> 6) | 192);
+                utftext += String.fromCharCode((c & 63) | 128);
+            } else {
+                utftext += String.fromCharCode((c >> 12) | 224);
+                utftext += String.fromCharCode(((c >> 6) & 63) | 128);
+                utftext += String.fromCharCode((c & 63) | 128);
+            }
+ 
+        }
+        return utftext;
+    }
+ 
+    // private method for UTF-8 decoding
+    _utf8_decode = function (utftext) {
+        var string = "";
+        var i = 0;
+        var c = c1 = c2 = 0;
+        while ( i < utftext.length ) {
+            c = utftext.charCodeAt(i);
+            if (c < 128) {
+                string += String.fromCharCode(c);
+                i++;
+            } else if((c > 191) && (c < 224)) {
+                c2 = utftext.charCodeAt(i+1);
+                string += String.fromCharCode(((c & 31) << 6) | (c2 & 63));
+                i += 2;
+            } else {
+                c2 = utftext.charCodeAt(i+1);
+                c3 = utftext.charCodeAt(i+2);
+                string += String.fromCharCode(((c & 15) << 12) | ((c2 & 63) << 6) | (c3 & 63));
+                i += 3;
+            }
+        }
+        return string;
+    }
+}
 
 /**
  * [init 初始化环境]
  */
 function init() {
     gui = require('nw.gui');
+    fs = require('fs');
+    os = require('os');
     win = gui.Window.get();
     shell = gui.Shell;
     clipboard = gui.Clipboard.get();
@@ -43,20 +161,27 @@ function init() {
     // 取消原始右键菜单
     document.oncontextmenu = function($event) { $event.preventDefault(); };
 
-    folderList = new Folder;
-    connectBackend();
-
     // debug
-    // baseDir = process.cwd(); // 开发环境使用这个
-    // win.showDevTools();
+    baseDir = process.cwd(); // 开发环境使用这个
+    win.showDevTools();
     // debug end
 
     // production
-    appPath = require('path');
-    baseDir = appPath.dirname(process.execPath);     // 正式场景使用这个
-    shell.openItem(baseDir+'/backend/webSocketServer.exe');
-    $app_reload_btn.style.display = 'none';     // 正式场景不显示
+    // appPath = require('path');
+    // baseDir = appPath.dirname(process.execPath);     // 正式场景使用这个
+    // $app_reload_btn.style.display = 'none';     // 正式场景不显示
     // production end
+
+    // 启动WebSocketServer
+    shell.openItem(baseDir+'/backend/webSocketServer.exe');
+    connectBackend();
+    var $homes = os.homedir().split('\\');
+    var $currentUser = $homes[ $homes.length - 1 ];
+    dataDir = baseDir+'/data';
+    dataFile = dataDir+'/'+$currentUser+'.dat';
+    createDataFolder();
+    folderList = new Folder;
+    folderList.readUserData();
 }
 
 function on_resize($event) {
@@ -343,14 +468,6 @@ Ssh.prototype.createTerm = function () {
     this.terminal.on('resize', function(){ $ssh.on_resize(); });
 }
 
-function prepareTextForClipboard(text) {
-    var space = String.fromCharCode(32), nonBreakingSpace = String.fromCharCode(160), allNonBreakingSpaces = new RegExp(nonBreakingSpace, 'g'), processedText = text.split('\n').map(function (line) {
-        var processedLine = line.replace(/\s+$/g, '').replace(allNonBreakingSpaces, space);
-        return processedLine;
-    }).join('\n');
-    return processedText;
-}
-
 /**
  * [login 向后端发送登录信息]
  */
@@ -516,16 +633,17 @@ Folder.prototype.addNode = function ( $type, $nodeInfo ) {
         this.id = 'currentNode';
     }
     $li.ondblclick = function () {
-        var $ssh = new Ssh(
-            $nodeInfo['ipaddr'],
-            $nodeInfo['port'],
-            $nodeInfo['user'],
-            $nodeInfo['passwd'],
-            $nodeInfo['privateKeyPath'],
-            $nodeInfo['loginType']
-        );
-        $ssh.create($nodeInfo['nodeName']);
-        $ssh.focus();
+        if ( $nodeInfo['remember'] ) {
+            createSshClient( $nodeInfo );
+        }else {
+            var $pass_object = {};
+            createPasswdBox($pass_object);
+            $pass_object.logBtn.onclick = function () {
+                $nodeInfo['passwd'] = $pass_object.passwdInput.value;
+                createSshClient( $nodeInfo );
+                $pass_object.fullbox.remove();
+            }
+        }
     };
 }
 
@@ -558,6 +676,7 @@ Folder.prototype.modNode = function ( $nodeInfo ) {
     $item['passwd'] = $nodeInfo['passwd'];
     $item['loginType'] = $nodeInfo['loginType'];
     $item['privateKeyPath'] = $nodeInfo['privateKeyPath'];
+    $item['remember'] = $nodeInfo['remember'];
 }
 
 /**
@@ -577,6 +696,54 @@ Folder.prototype.getNode = function ( $nodeName ) {
     }
 }
 
+/**
+ * [saveUserData 保存用户的数据]
+ */
+Folder.prototype.saveUserData = function () {
+    var $clearText = '';
+    var $encryp_str = '';
+    var $encryp = new Base64();    
+
+    for ( var $i = 0; $i < this.list.length; ++$i ) {
+        var $write_str = JSON.stringify( this.list[$i] );
+        $clearText += $write_str+'\n';
+    }
+    $encryp_str = $encryp.encode( $clearText );
+
+    fs.open(dataFile, 'w', 0644, function (err, fp) {
+        if (err) showMessage(err);
+        else {
+            fs.write(fp, $encryp_str, function(err){
+                if (err) showMessage('写入文件失败.'); 
+            });
+        }
+    });
+}
+
+/**
+ * [readUserData 读取用户的数据]
+ */
+Folder.prototype.readUserData = function () {
+    var $folder = this;
+    var $clearText = '';
+    var $encryp_str = '';
+    var $dataList = undefined;
+    var $encryp = new Base64();
+
+    fs.readFile(dataFile, function (err, data) {
+        if ( err ) return;
+        $encryp_str = data.toString();
+        $clearText = $encryp.decode( $encryp_str );
+        $dataList = $clearText.split('\n');
+        for ( var $i = 0; $i < $dataList.length; ++$i ) {
+            $folder.list.push( JSON.parse( $dataList[$i] ) );
+        }
+    });
+}
+
+/**
+ * [hideMenu 隐藏菜单]
+ */
 function hideMenu() {
     var $showBtn = document.getElementsByClassName('show-btn')[0];
     var $rightBox = document.getElementsByClassName('right-nav')[0];
@@ -601,6 +768,11 @@ function showMenu() {
     }
 }
 
+/**
+ * [createKey 创建ssh密钥]
+ * @param  {[type]} $key_type [密钥类型RSA|DSA]
+ * @param  {[type]} $passwd   [密钥密码]
+ */
 function createKey($key_type, $passwd) {
     if ( wsc == null ) return;
     var $data_json = {
@@ -614,6 +786,11 @@ function createKey($key_type, $passwd) {
     wsc.write($data_str);
 }
 
+/**
+ * [config 配置文件的下载地址和ssh密钥存放地址]
+ * @param  {[type]} $sshKeyPath   [ssh存放地址]
+ * @param  {[type]} $downloadPath [文件下载地址]
+ */
 function config( $sshKeyPath, $downloadPath ) {
     if ( wsc == null ) return;
     var $data_json = {
@@ -630,6 +807,10 @@ function config( $sshKeyPath, $downloadPath ) {
     key_dir = $sshKeyPath;
 }
 
+/**
+ * [createSelectFileBox 创建文件选择窗口]
+ * @param  {[type]} $fileInput [文件地址显示框]
+ */
 function createSelectFileBox( $fileInput ) {
     var $selectInput = document.createElement('input');
 
@@ -644,6 +825,10 @@ function createSelectFileBox( $fileInput ) {
     $selectInput.click();
 }
 
+/**
+ * [createSelectFolderBox 创建选择文件夹窗口]
+ * @param  {[type]} $dirInput [文件夹地址显示框]
+ */
 function createSelectFolderBox( $dirInput ) {
     var $selectInput = document.createElement('input');
 
@@ -683,6 +868,8 @@ function createAddNodeBox() {
     var $cancelBtn = document.createElement('button');
     var $spantext1 = document.createElement('span');
     var $spantext2 = document.createElement('span');
+    var $spantext3 = document.createElement('span');
+    var $rememberInput = document.createElement('input');
 
     createMessageBox($box_object);
 
@@ -706,13 +893,15 @@ function createAddNodeBox() {
     $cancelBtn.innerHTML = '取消';
     $spantext1.innerHTML = '密码登录';
     $spantext2.innerHTML = '密钥登录';
+    $spantext3.innerHTML = '记住密码'; $spantext3.className = 'remember-text';
+    $rememberInput.type = 'checkbox'; $rememberInput.name = 'remember'; $rememberInput.className = 'remember-checkbox'; $rememberInput.value = '1';
 
     $linkName.appendChild($linkNameInput);
     $hostInfo.appendChild($hostInput); $hostInfo.appendChild($portInput);
     $userInfo.appendChild($userInput);
     $loginTypeBox.appendChild($passwdRadio); $loginTypeBox.appendChild($spantext1);
     $loginTypeBox.appendChild($privateRadio); $loginTypeBox.appendChild($spantext2);
-    $selectBox.appendChild($passwdInput);
+    $selectBox.appendChild($passwdInput); $selectBox.appendChild($spantext3); $selectBox.appendChild($rememberInput);
     $btnBox.appendChild($addBtn); $btnBox.appendChild($cancelBtn);
     $box_object.content.appendChild( $linkName );
     $box_object.content.appendChild( $hostInfo );
@@ -723,16 +912,18 @@ function createAddNodeBox() {
 
     // 事件绑定
     $passwdRadio.onchange = function() {
-        $selectBox.removeChild($passwdInput);
-        $selectBox.removeChild($privateInput);
-        $selectBox.removeChild($fileBtn);
+        removeAll($selectBox);
         $selectBox.appendChild($passwdInput);
+        $selectBox.appendChild($spantext3);
+        $selectBox.appendChild($rememberInput);
     }
     $privateRadio.onchange = function () {
-        $selectBox.removeChild($passwdInput);
+        removeAll($selectBox);
         $selectBox.appendChild($privateInput);
         $selectBox.appendChild($fileBtn);
         $selectBox.appendChild($passwdInput);
+        $selectBox.appendChild($spantext3);
+        $selectBox.appendChild($rememberInput);
     }
     $addBtn.onclick = function () {
         var $nodeInfo = {
@@ -742,7 +933,8 @@ function createAddNodeBox() {
             'user': $userInput.value,
             'passwd': $passwdInput.value,
             'loginType': ($passwdRadio.checked)? 0: 1,
-            'privateKeyPath': $privateInput.value
+            'privateKeyPath': $privateInput.value,
+            'remember': $rememberInput.checked
         };
         folderList.addNode( 0, $nodeInfo );
         $box_object.fullBox.remove();
@@ -787,6 +979,8 @@ function createModNodeBox() {
     var $cancelBtn = document.createElement('button');
     var $spantext1 = document.createElement('span');
     var $spantext2 = document.createElement('span');
+    var $spantext3 = document.createElement('span');
+    var $rememberInput = document.createElement('input');
 
     createMessageBox($box_object);
 
@@ -810,6 +1004,8 @@ function createModNodeBox() {
     $cancelBtn.innerHTML = '取消';
     $spantext1.innerHTML = '密码登录';
     $spantext2.innerHTML = '密钥登录';
+    $spantext3.innerHTML = '记住密码'; $spantext3.className = 'remember-text';
+    $rememberInput.type = 'checkbox'; $rememberInput.name = 'remember'; $rememberInput.className = 'remember-checkbox'; $rememberInput.value = '1';
 
     // 填充数值
     $linkNameInput.value = $item['nodeName'];
@@ -818,6 +1014,7 @@ function createModNodeBox() {
     $userInput.value = $item['user'];
     $passwdInput.value = $item['passwd'];
     $privateInput.value = $item['privateKeyPath'];
+    $rememberInput.checked = $item['remember'];
 
     if ( $item['loginType'] == 0 ){
         $passwdRadio.checked = 'true';
@@ -829,6 +1026,8 @@ function createModNodeBox() {
         $selectBox.appendChild($fileBtn);
         $selectBox.appendChild($passwdInput);
     }
+    $selectBox.appendChild($spantext3);
+    $selectBox.appendChild($rememberInput);
 
     $linkName.appendChild($linkNameInput);
     $hostInfo.appendChild($hostInput); $hostInfo.appendChild($portInput);
@@ -845,16 +1044,18 @@ function createModNodeBox() {
 
     // 事件绑定
     $passwdRadio.onchange = function() {
-        $selectBox.removeChild($passwdInput);
-        $selectBox.removeChild($privateInput);
-        $selectBox.removeChild($fileBtn);
+        removeAll($selectBox);
         $selectBox.appendChild($passwdInput);
+        $selectBox.appendChild($spantext3);
+        $selectBox.appendChild($rememberInput);
     }
     $privateRadio.onchange = function () {
-        $selectBox.removeChild($passwdInput);
+        removeAll($selectBox);
         $selectBox.appendChild($privateInput);
         $selectBox.appendChild($fileBtn);
         $selectBox.appendChild($passwdInput);
+        $selectBox.appendChild($spantext3);
+        $selectBox.appendChild($rememberInput);
     }
     $modBtn.onclick = function () {
         var $nodeInfo = {
@@ -864,7 +1065,8 @@ function createModNodeBox() {
             'user': $userInput.value,
             'passwd': $passwdInput.value,
             'loginType': ($passwdRadio.checked)? 0: 1,
-            'privateKeyPath': $privateInput.value
+            'privateKeyPath': $privateInput.value,
+            'remember': $rememberInput.checked
         };
         folderList.modNode( $nodeInfo );
         $box_object.fullBox.remove();
@@ -911,16 +1113,19 @@ function on_app_max() {
  * [on_app_close 关闭程序]
  */
 function on_app_close() {
+    // 先隐藏
     win.hide();
     // 做一些善后处理
+    // 1. 保存用户数据
+    folderList.saveUserData();
+    // 2. 向服务端发退出请求
     var $data_json = {
         'request': 'app_close',
-        'data': {
-            'FolderList': folderList.list
-        }
+        'data': {}
     };
     var $data_str = JSON.stringify($data_json);
-    wsc.write($data_str);
+    wsc.write( $data_str );
+    // 关闭窗口
     win.close();
 }
 
@@ -1101,6 +1306,9 @@ function on_click_reload() {
     win.reload();
 }
 
+/**
+ * 链接后端服务器, 尝试链接十次, 如果十次都失败, 表示websocketserver启动缓慢, 或者启动失败. 提示手动启动WebSocketServer
+ */
 function connectBackend() {
     if ( wsc == null ) {
         wsc = new WebSocketClient;
@@ -1159,6 +1367,75 @@ function showMessage(msg) {
     $msg_object.content.appendChild($span);
 }
 
+function createPasswdBox( $ret_obj ) {
+    var $box_object = {};
+    var $passwdInput = document.createElement('input');
+    var $btnBox = document.createElement('div');
+    var $logBtn = document.createElement('button');
+    var $cancelBtn = document.createElement('button');
+
+    createMessageBox( $box_object );
+
+    $passwdInput.type = 'password'; $passwdInput.placeholder = 'password';
+    $box_object.header.innerHTML = '输入密码';
+    $btnBox.className = 'new-btn';
+    $logBtn.innerHTML = '登录';
+    $cancelBtn.innerHTML = '取消';
+
+    $btnBox.appendChild($logBtn);
+    $btnBox.appendChild($cancelBtn);
+    $box_object.content.appendChild($passwdInput);
+    $box_object.content.appendChild($btnBox);
+
+    // 事件绑定
+    $cancelBtn.onclick = function () { $box_object.fullBox.remove(); }
+    $ret_obj.logBtn = $logBtn;
+    $ret_obj.passwdInput = $passwdInput;
+    $ret_obj.fullbox = $box_object.fullBox;
+}
+
+/**
+ * [createSshClient 创建ssh客户端]
+ * @param  {[object]} $user_info [登录的相关信息]
+ */
+function createSshClient( $user_info ) {
+    var $ssh = new Ssh(
+        $user_info['ipaddr'],
+        $user_info['port'],
+        $user_info['user'],
+        $user_info['passwd'],
+        $user_info['privateKeyPath'],
+        $user_info['loginType']
+    );
+    $ssh.create($user_info['nodeName']);
+    $ssh.focus();
+}
+
+/**
+ * [createDataFolder 判断用户文件夹是否存在]
+ */
+function createDataFolder() {
+    fs.exists(dataDir, function (result) {
+        // 判断目录是否存在
+        if (!result) {
+            // 不存在
+            fs.mkdir(dataDir, 0755, function (err) {
+                if (err) {
+                    showMessage("创建用户数据目录失败。");
+                }
+            });
+        }
+    });
+}
+
+function prepareTextForClipboard(text) {
+    var space = String.fromCharCode(32), nonBreakingSpace = String.fromCharCode(160), allNonBreakingSpaces = new RegExp(nonBreakingSpace, 'g'), processedText = text.split('\n').map(function (line) {
+        var processedLine = line.replace(/\s+$/g, '').replace(allNonBreakingSpaces, space);
+        return processedLine;
+    }).join('\n');
+    return processedText;
+}
+
 /**
  * [moveDiv 移动DIV]
  */
@@ -1176,6 +1453,16 @@ function moveDiv(event, $box) {
         $isMove = false;
         window.onmousemove = null;
         window.onmouseup = null;
+    }
+}
+
+/**
+ * [removeAll 删除元素下面的所有子元素]
+ * @param  {[type]} $parentNode [父元素节点]
+ */
+function removeAll( $parentNode ) {
+    while( $parentNode.childNodes.length ) {
+        $parentNode.removeChild( $parentNode.childNodes[0] );
     }
 }
 

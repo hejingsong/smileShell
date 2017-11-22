@@ -277,8 +277,9 @@ class WebSocketClient(object):
 
     def app_close(self, data):
         # 退出时的准备工作
-        with open(config.data_file, 'wb') as fp:
-            pickle.dump(data['FolderList'], fp)
+        # 已经交由前端处理, 后端不处理
+        # with open(config.data_file, 'wb') as fp:
+        #     pickle.dump(data['FolderList'], fp)
 
         with open(config.conf_file, 'wb') as fp:
             fp.write('down_dir='+config.down_dir+'\r\n')
@@ -357,8 +358,9 @@ class WebSocketServer(object):
 
     def __init__(self):
         self.__listenfd = None
-        if not os.path.exists(config.data_dir):
-            os.mkdir(config.data_dir, config.dir_mode)
+        # 在前端已经实现
+        # if not os.path.exists(config.data_dir):
+        #     os.mkdir(config.data_dir, config.dir_mode)
         if not os.path.exists(config.conf_dir):
             os.mkdir(config.conf_dir, config.dir_mode)
         if not os.path.exists(config.down_dir):

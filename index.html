@@ -2397,6 +2397,8 @@ img.nav-close:hover {background-color:red;}
 #mycontentmenu{ position:fixed; background:#f1f1f1; padding:2px; box-shadow:2px 2px 2px rgba(0, 0, 0, .6); width:180px; overflow:hidden; z-index: 1; }
 #mycontentmenu li { height:24px; cursor:default; line-height:24px; white-space:nowrap; padding:0 30px; width:100%; user-select: none; }
 #mycontentmenu li:hover { background:#E6EDF6; box-shadow: 0px 0px 1px #729fcf inset; }
+.select-box .remember-checkbox {     display: inline-block; height: inherit; width: inherit; margin-top: 10px; margin-left: 10px; }
+.remember-text { color: #ccc; margin-left: 300px; }
 /*#mycontentmenu {position: fixed; border-radius: 2px; font-size: 15px;color: white; background-color:#333;z-index: 15;}
 #mycontentmenu li {height: 30px; line-height:30px;margin-bottom: 5px;padding: 0px 10px;}
 #mycontentmenu li:hover{background-color: #222;box-shadow: 0px 0px 5px #111 inset;}*/
@@ -2430,15 +2432,15 @@ img.nav-close:hover {background-color:red;}
 
     <div class='logo'></div>
     <!-- 开发的时候使用这里的.js文件 下面的bin文件是有js编译而成的 -->
-    <!-- <script src='static_dev/js/xterm.js'></script> -->
-    <!-- <script src='static_dev/js/fit.js'></script> -->
-    <!-- <script src='static_dev/js/script.js'></script> -->
+    <script src='static_dev/js/xterm.js'></script>
+    <script src='static_dev/js/fit.js'></script>
+    <script src='static_dev/js/script.js'></script>
 </body>
 </html>
  
 <script>
     // 这里只有在正式环境才使用这里的bin文件
-    nw.Window.get().evalNWBin(null, './static/bin/xterm.bin');
-    nw.Window.get().evalNWBin(null, './static/bin/fit.bin');
-    nw.Window.get().evalNWBin(null, './static/bin/script.bin');
+    // nw.Window.get().evalNWBin(null, './static/bin/xterm.bin');
+    // nw.Window.get().evalNWBin(null, './static/bin/fit.bin');
+    // nw.Window.get().evalNWBin(null, './static/bin/script.bin');
 </script>
