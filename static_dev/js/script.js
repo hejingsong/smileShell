@@ -1,3 +1,8 @@
+/**
+ * script.js
+ * Author: Hejs
+ * Email:  240197153@qq.com
+ */
 var gui, win, shell, clipboard, appPath, fs, os = null;
 var localUrl = 'ws://127.0.0.1:12345';
 var isMaxScreen = false;    // 判断是否是最大化
@@ -7,12 +12,17 @@ var try_conn = 0;           // 尝试连接后端WebSocketServer次数
 var max_try = 10;           // 最大尝试连接次数
 var dataDir = '';           // 保存用户数据文件夹
 var dataFile = '';          // 用户保存的数据
-var down_dir = '';          // 下载文件保存路径
-var key_dir = '';           // sshKey保存路径
+var confDir = '';           // 用户配置文件夹
+var confFile = '';          // 用户配置文件名
+var user_conf = {           // 
+    'down_dir': '',
+    'key_dir' : ''
+};
+// var down_dir = '';          // 下载文件保存路径
+// var key_dir = '';           // sshKey保存路径
 
 
 /**
-*
 *  Base64 encode / decode
 *
 *  @author haitao.tu
@@ -174,14 +184,17 @@ function init() {
 
     // 启动WebSocketServer
     shell.openItem(baseDir+'/backend/webSocketServer.exe');
-    connectBackend();
     var $homes = os.homedir().split('\\');
     var $currentUser = $homes[ $homes.length - 1 ];
     dataDir = baseDir+'/data';
     dataFile = dataDir+'/'+$currentUser+'.dat';
+    confDir = baseDir + '/conf';
+    confFile = confDir + '/' + $currentUser + '.conf';
     createDataFolder();
     folderList = new Folder;
     folderList.readUserData();
+
+    connectBackend();
 }
 
 function on_resize($event) {
@@ -199,7 +212,6 @@ function on_resize($event) {
  * 当鼠标左键弹起的时候, 复制选中内容。
  */
 function on_copy_handle($event) {
-    // console.log( window.getSelection().toString() );
     if ( $event.button != 0 ) {
         return false;
     }
@@ -239,7 +251,7 @@ function WebSocketClient() {
 }
 
 WebSocketClient.prototype.addClient = function (obj) {
-    this.clients.push(obj);
+    return this.clients.push(obj);
 }
 
 WebSocketClient.prototype.delClient = function (obj) {
@@ -320,8 +332,10 @@ WebSocketClient.prototype.on_message = function($event) {
         showMessage($response_data['msg']);
     } else if ( $response == 'FolderList' ) {
         wsc.getFolderList($response_data);
-    } else if ( $response == 'config' ) {
-        wsc.getConfig($response_data);
+    } else if ( $response == 'upload' ) {
+        createUpDownMessage( $response_data );
+    } else if ( $response == 'download' ) {
+        createUpDownMessage( $response_data );
     }
 }
 
@@ -351,10 +365,11 @@ WebSocketClient.prototype.getFolderList = function ( $data ) {
     }
 }
 
+/* 不再使用
 WebSocketClient.prototype.getConfig = function ( $data ) {
     down_dir = $data['down_dir'];
     key_dir = $data['key_dir'];
-}
+}*/
 
 /**
  * [Ssh 用于读取用户输入和WebSocketClient传来的数据]
@@ -365,6 +380,7 @@ function Ssh($ipaddr, $port, $user, $pass, $priKey, $loginType) {
     this.navElement = null;
     this.termElement = null;
     this.logined = 0;       // 登录状态 0 - 未登录 1 - 已登录 2 - 重新登录
+    this.command_prompt = '';   // 提示字符串
     this.ipaddr = $ipaddr;
     this.port = $port;
     this.user = $user;
@@ -399,7 +415,7 @@ Ssh.prototype.create = function ($nodeName) {
         $connNav.style.display = 'block';
 
     }
-    // 如果WebSocketClient还没有实例化, 就实例化
+
     wsc.addClient(this);
 
     this.id = this.makeId();
@@ -496,6 +512,7 @@ Ssh.prototype.logout = function() {
     this.navElement.img.src = 'static/img/false.png';
     this.navElement.img.className = '';
     this.logined = 2;   // 重新登录状态
+    this.command_prompt = '';
     this.write('***** \033[40;36mPress Enter to login again :)\033[0m *****\r\n');
 }
 
@@ -557,6 +574,7 @@ Ssh.prototype.destroy = function () {
  * @param  {[string]} $data [键盘按下的字符]
  */
 Ssh.prototype.on_key_event = function ($data) {
+    var $ssh = this;
     if ( this.logined == 0 ) return;    // 如果时为登录状态就直接返回
 
     // 重新登录状态 并且 按下回车
@@ -564,6 +582,37 @@ Ssh.prototype.on_key_event = function ($data) {
         this.login();
         this.logined = 0;
         return;
+    }
+
+    // 如果提示符为空, 表示刚开始登录, 获取登录提示符
+    
+    if ( this.command_prompt == '' ) {
+        var $cursor = document.getElementsByClassName('terminal-cursor')[ wsc.clients.indexOf(this) ];
+        this.command_prompt = prepareTextForClipboard($cursor.parentElement.textContent);
+    }
+
+    if ( $data == '\r' ) {
+        var $cursor = document.getElementsByClassName('terminal-cursor')[ wsc.clients.indexOf(this) ];
+        var $command = prepareTextForClipboard($cursor.parentElement.textContent);
+        var $input = trim( $command.replace( this.command_prompt, '') );
+        var $commandList = $input.split(' ');
+        var $c = $commandList[0];
+        $commandList.splice(0, 1);
+        var $file = findStr($commandList);
+        if ( $c == 'rz' ) {
+            var $fileInput = createUploadFileBox();
+            $fileInput.onchange = function() { $ssh.on_upload_file( this.value ); this.remove(); }
+            $fileInput.oncancel = function() { $ssh.on_key_event( '\x15\r' ); this.remove(); }
+            this.write('\r\n');
+            return false;
+        }else if ( $c == 'sz' ) {
+            if ( $file == undefined ) {
+                $ssh.on_key_event( '\x15\r' );
+            }else
+                this.on_download_file( $file );
+            this.write('\r\n');
+            return false;
+        }
     }
 
     var $data_json = {
@@ -587,6 +636,40 @@ Ssh.prototype.on_resize = function() {
         }
     };
     var $data_str = JSON.stringify($data_json);
+    wsc.write($data_str);
+}
+
+/**
+ * [on_upload_file 上传文件事件]
+ * @param  {[string]} $filename [文件名]
+ */
+Ssh.prototype.on_upload_file = function($filename) {
+    var $data_json = {
+        'request': 'upload',
+        'data': {
+            'id': this.id,
+            'data': ($filename == undefined)? '': $filename.replace(/\\/g, '/')
+        }
+    };
+    $data_str = JSON.stringify($data_json);
+    wsc.write($data_str);
+}
+
+/**
+ * [on_download_file 下载文件事件]
+ * @param  {[string]} $filename [文件名]
+ * @return {[type]} [description]
+ */
+Ssh.prototype.on_download_file = function($filename) {
+    var $data_json = {
+        'request': 'download',
+        'data': {
+            'id': this.id,
+            'path': (user_conf['down_dir'] == '')? '../download': user_conf['down_dir'],
+            'data': ($filename == undefined)? '': $filename
+        }
+    };
+    $data_str = JSON.stringify($data_json);
     wsc.write($data_str);
 }
 
@@ -702,7 +785,8 @@ Folder.prototype.getNode = function ( $nodeName ) {
 Folder.prototype.saveUserData = function () {
     var $clearText = '';
     var $encryp_str = '';
-    var $encryp = new Base64();    
+    var $encryp = new Base64();
+    var $conf_str = '';  
 
     for ( var $i = 0; $i < this.list.length; ++$i ) {
         var $write_str = JSON.stringify( this.list[$i] );
@@ -710,10 +794,21 @@ Folder.prototype.saveUserData = function () {
     }
     $encryp_str = $encryp.encode( $clearText );
 
+    $conf_str = 'down_dir=' + user_conf['down_dir'] + '\n' + 'key_dir=' + user_conf['key_dir'];
+
     fs.open(dataFile, 'w', 0644, function (err, fp) {
         if (err) showMessage(err);
         else {
             fs.write(fp, $encryp_str, function(err){
+                if (err) showMessage('写入文件失败.'); 
+            });
+        }
+    });
+
+    fs.open(confFile, 'w', 0644, function (err, fp) {
+        if (err) showMessage(err);
+        else {
+            fs.write(fp, $conf_str, function(err){
                 if (err) showMessage('写入文件失败.'); 
             });
         }
@@ -737,6 +832,16 @@ Folder.prototype.readUserData = function () {
         $dataList = $clearText.split('\n');
         for ( var $i = 0; $i < $dataList.length; ++$i ) {
             $folder.list.push( JSON.parse( $dataList[$i] ) );
+        }
+    });
+
+    fs.readFile(confFile, function (err, data) {
+        if ( err ) return;
+        var $confData = data.toString();
+        $dataList = $confData.split('\n');
+        for ( var $i = 0; $i < $dataList.length; ++$i ) {
+            var $kv = $dataList[$i].split('=');
+            user_conf[ trim( $kv[0] ) ] = trim( $kv[1] );
         }
     });
 }
@@ -779,6 +884,7 @@ function createKey($key_type, $passwd) {
         'request': 'createKey',
         'data': {
             'type': $key_type,
+            'path': (user_conf['key_dir'] == '')? '../sshkey': user_conf['key_dir'],
             'passwd': $passwd
         }
     };
@@ -793,18 +899,30 @@ function createKey($key_type, $passwd) {
  */
 function config( $sshKeyPath, $downloadPath ) {
     if ( wsc == null ) return;
-    var $data_json = {
-        'request': 'config',
-        'data': {
-            'sshKeyPath': $sshKeyPath,
-            'downloadPath': $downloadPath
-        }
-    };
-    var $data_str = JSON.stringify($data_json);
-    wsc.write( $data_str );
+    // 现在已经不用向后台发送配置命令
+    // var $data_json = {
+    //     'request': 'config',
+    //     'data': {
+    //         'sshKeyPath': $sshKeyPath,
+    //         'downloadPath': $downloadPath
+    //     }
+    // };
+    // var $data_str = JSON.stringify($data_json);
+    // wsc.write( $data_str );
 
-    down_dir = $downloadPath;
-    key_dir = $sshKeyPath;
+    user_conf['down_dir'] = $downloadPath;
+    user_conf['key_dir'] = $sshKeyPath;
+}
+
+function createUploadFileBox() {
+    var $selectInput = document.createElement('input');
+
+    $selectInput.style.display = 'none';
+    $selectInput.type = 'file';
+    $selectInput.className = 'File';
+
+    $selectInput.click();
+    return $selectInput;
 }
 
 /**
@@ -1163,13 +1281,15 @@ function on_click_conn() {
     $box_object.content.appendChild($hostInfoBox); $box_object.content.appendChild($userInfoBox); $box_object.content.appendChild($connBtn);
 
     $trueBtn.onclick = function () {
-        var $nodeName = $hostInput.value;
-        var $port = $portInput.value;
-        var $user = $userInput.value;
-        var $pass = $passInput.value;
-        var $ssh = new Ssh($nodeName, $port, $user, $pass, '', 0);
-        $ssh.create($nodeName);
-        $ssh.focus();
+        createSshClient({
+            nodeName        : $hostInput.value,
+            ipaddr          : $hostInput.value,
+            port            : $portInput.value,
+            user            : $userInput.value,
+            passwd          : $passInput.value,
+            privateKeyPath  : '',
+            loginType       : 0
+        });
         $box_object.fullBox.remove();
     };
     $falseBtn.onclick = function() { $box_object.fullBox.remove(); };
@@ -1240,8 +1360,8 @@ function on_click_set() {
     $falseBtn.innerHTML = '取消';
  
     // 填充数据
-    $privateKeyInput.value = key_dir;
-    $downLoadInput.value = down_dir;
+    $privateKeyInput.value = user_conf['key_dir'];
+    $downLoadInput.value = user_conf['down_dir'];
 
     $settingBtn.appendChild($trueBtn); $settingBtn.appendChild($falseBtn);
     $box_object.content.appendChild($privateKeyInput);
@@ -1415,6 +1535,7 @@ function createSshClient( $user_info ) {
  * [createDataFolder 判断用户文件夹是否存在]
  */
 function createDataFolder() {
+    // 创建用户保存数据文件夹
     fs.exists(dataDir, function (result) {
         // 判断目录是否存在
         if (!result) {
@@ -1426,6 +1547,33 @@ function createDataFolder() {
             });
         }
     });
+    // 创建用户配置数据文件夹
+    fs.exists(confDir, function (result) {
+        // 判断目录是否存在
+        if (!result) {
+            // 不存在
+            fs.mkdir(confDir, 0755, function (err) {
+                if (err) {
+                    showMessage("创建用户配置目录失败。");
+                }
+            });
+        }
+    });
+}
+
+/**
+ * [createUpDownMessage 创建上传和下载文件消息通知框]
+ * @param  {[string]} $msg [消息]
+ */
+function createUpDownMessage( $msg ) {
+    var $box = document.createElement('div');
+    var $body = document.getElementsByTagName('body')[0];
+    $box.innerHTML = $msg;
+    $box.className = 'up_down';
+    window.setTimeout(function () {
+        $box.remove();
+    }, 3000);
+    $body.appendChild( $box );
 }
 
 function prepareTextForClipboard(text) {
@@ -1463,6 +1611,30 @@ function moveDiv(event, $box) {
 function removeAll( $parentNode ) {
     while( $parentNode.childNodes.length ) {
         $parentNode.removeChild( $parentNode.childNodes[0] );
+    }
+}
+
+/**
+ * [trimStr 去除字符串首尾空格]
+ * @param  {[string]} str [需要处理的字符串]
+ * @return {[string]}     [处理之后的字符串]
+ */
+function trim(str){
+    return str.replace(/(^\s*)|(\s*$)/g, "");
+}
+
+/**
+ * [findStr 查找数组中最近的不为空的元素]
+ * @param  {[Array]} arr [需要查找的数组]
+ * @return {[string]}      [不为空的元素]
+ */
+function findStr(arr) {
+    var $i = 0;
+
+    for( $i = 0; $i < arr.length; ++$i ) {
+        if ( arr[$i] != '' ) {
+            return arr[$i];
+        }
     }
 }
 

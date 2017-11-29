@@ -1,11 +1,13 @@
 #! /usr/bin/env python
 #_*_ coding:utf-8 _*_
 
+import re
 import json
 import socket
 import paramiko
 
 import config
+import logger
 
 class Ssh(object):
     def __init__(self, **kwargs):
@@ -18,6 +20,8 @@ class Ssh(object):
         self.rows = kwargs['rows']
         self.cols = kwargs['cols']
         self.loginType = kwargs['loginType']
+        self.__logger = logger.Logger()
+        self.handler = re.compile(r'^.*pwd\r\n(.*)\r\n.*$')
         self.clt = None
         self.chan = None
 
@@ -39,8 +43,8 @@ class Ssh(object):
                     hostname=self.host,
                     port=int(self.port),
                     username=self.user,
-                    password=self.passwd,
-                    timeout=1.5         # 这里不能链接太长时间, 不然会阻塞整个进程
+                    password=self.passwd
+                    # timeout=1.5         # 这里不能链接太长时间, 不然会阻塞整个进程
                 )
             else:
                 # 秘钥登录
@@ -90,13 +94,13 @@ class Ssh(object):
         self.chan.resize_pty(width=cols, height=rows)
 
     @staticmethod
-    def createKey(key_type, passwd):
+    def createKey(key_type, passwd, path):
         ret = dict(
             status=True,
             msg=''
         )
-        primaryFile = '%s/Identity'%(config.key_dir,)
-        publicFile = '%s/Identity.pub'%(config.key_dir,)
+        primaryFile = '%s/Identity'%(path,)
+        publicFile = '%s/Identity.pub'%(path,)
         privateFp = open(primaryFile, 'wb')
         publicFp = open(publicFile, 'wb')
         try:
@@ -128,8 +132,62 @@ class Ssh(object):
             ret['msg'] = 'success'
         return ret
 
-    def upload(self, msg):
-        pass
+    def getCurrentPath(self):
+        data = ''
+        recvData = ''
+        try:
+            self.chan.sendall('\x15pwd\r')
+            while 1:
+                data = self.chan.recv(1)
+                recvData += data
+                if data == '$' or data == '#':
+                    break
+            if len(recvData) == 0:
+                return '~'
+            currentPath = self.handler.findall(recvData)
+            if len(currentPath) == 0:
+                return'~'
+            else: 
+                return currentPath[0]
+        except:
+            self.__logger.write_log(2, 'can\'t found current path.')
+            return '~'
 
-    def download(self, msg):
-        pass
+    def upload(self, fileName, remote_path):
+        file = fileName.split('/')[-1]
+        data = u'%s 上传成功'%(file, )
+        try:
+            sftpClient = paramiko.SFTPClient.from_transport(self.clt.get_transport())
+            sftpClient.put(fileName, remote_path+'/'+file)
+        except paramiko.SSHException as e:
+            data = str(e)
+            self.__logger.write_log(2, data)
+        except IOError as e:
+            data = str(e)
+            self.__logger.write_log(2, data)
+        finally:
+            sftpClient.close()
+        return data
+
+    def download(self, path, fileName, remote_path):
+        data = ''
+        remoteFile = ''
+        if fileName[0] == '/':
+            remoteFile = fileName
+        else:
+            remoteFile = remote_path + '/' + fileName.strip()
+        fileName = fileName.split('/')[-1]
+        data = u'%s 下载成功' %(fileName,)
+
+        try:
+            sftpClient = paramiko.SFTPClient.from_transport(self.clt.get_transport())
+            sftpClient.get(remoteFile, path+'/'+fileName)
+        except paramiko.SSHException as e:
+            data = str(e)
+            self.__logger.write_log(2, data)
+        except IOError as e:
+            data = str(e)
+            self.__logger.write_log(2, data)
+        finally:
+            sftpClient.close()
+        return data

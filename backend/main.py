@@ -6,3 +6,4 @@ import server
 if __name__ == '__main__':
     wss = server.WebSocketServer()
     wsc = wss.start()
+    wsc.run()

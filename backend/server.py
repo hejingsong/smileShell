@@ -4,6 +4,7 @@
 import os
 import sys
 import json
+import time
 import pickle
 import struct
 import base64
@@ -11,6 +12,7 @@ import select
 import socket
 import hashlib
 import paramiko
+import threading
 
 import ssh
 import logger
@@ -169,6 +171,7 @@ class WebSocketClient(object):
         return _buffer_json
 
     def sendFolderList(self):
+        ''' 发送用户保存的链接, 现在已经不使用, 已经由前端nodejs完成 '''
         response = dict(response='FolderList', data=None)
         if os.path.exists(config.data_file):
             with open(config.data_file, 'ab+') as fp:
@@ -178,8 +181,7 @@ class WebSocketClient(object):
         self.sendMessage( json.dumps(response) )
 
     def readConfig(self):
-        ''' 读取配置文件 '''
-        response = dict(response='config', data=None)
+        ''' 读取配置文件, 现在已经不使用, 已经由前端nodejs完成 '''
         config_obj = dict(down_dir='', key_dir='')
         if os.path.exists(config.conf_file):
             with open(config.conf_file, 'rb') as fp:
@@ -189,15 +191,9 @@ class WebSocketClient(object):
 
         if config_obj['down_dir'] != '':
             config.down_dir = config_obj['down_dir']
-        else:
-            config_obj['down_dir'] = config.down_dir
 
         if config_obj['key_dir'] != '':
             config.key_dir = config_obj['key_dir']
-        else:
-            config_obj['key_dir'] = config.key_dir
-        response['data'] = config_obj
-        self.sendMessage( json.dumps(response) )
 
     def addClient(self, clt):
         # 添加一个ssh连接
@@ -246,8 +242,8 @@ class WebSocketClient(object):
             data['port'],
             response['data']['data'])
         )
-        return response
-
+        self.sendMessage( json.dumps(response) )
+        
     def session(self, data):
         # 会话
         response = dict(response='data', data=None)
@@ -265,7 +261,7 @@ class WebSocketClient(object):
     def createKey(self, data):
         # 创建sshkey
         response = dict(response='key', data=None)
-        response['data'] = ssh.Ssh.createKey(data['type'], data['passwd'])
+        response['data'] = ssh.Ssh.createKey(data['type'], data['passwd'], data['path'])
         return response
 
     def config(self, data):
@@ -275,15 +271,18 @@ class WebSocketClient(object):
         if data['sshKeyPath'] != '':
             config.key_dir = data['sshKeyPath']
 
+    def upload(self, ssh_clt, data, remote_path):
+        response = dict(response='upload', data=None)
+        response['data'] = ssh_clt.upload(data, remote_path)
+        self.sendMessage( json.dumps(response) )
+
+    def download(self, ssh_clt, path, data, remote_path):
+        response = dict(response='download', data=None)
+        response['data'] = ssh_clt.download(path, data, remote_path)
+        self.sendMessage( json.dumps(response) )
+
     def app_close(self, data):
         # 退出时的准备工作
-        # 已经交由前端处理, 后端不处理
-        # with open(config.data_file, 'wb') as fp:
-        #     pickle.dump(data['FolderList'], fp)
-
-        with open(config.conf_file, 'wb') as fp:
-            fp.write('down_dir='+config.down_dir+'\r\n')
-            fp.write('key_dir='+config.key_dir+'\r\n')
         self.__logger.write_log(0, 'application goto down.')
         self.__run_state = False
 
@@ -294,7 +293,8 @@ class WebSocketClient(object):
             self.__run_state = False
         ret = None
         if msg_json['request'] == 'login':          # 请求登录
-            ret = self.login(msg_json['data'])
+            ''' 由于登录是阻塞的, 所以利用线程, 避免阻塞进程 '''
+            threading.Thread(target=self.login, args=(msg_json['data'], )).start()
 
         elif msg_json['request'] == 'data':         # 请求通信
             ret = self.session(msg_json['data'])
@@ -305,13 +305,30 @@ class WebSocketClient(object):
         elif msg_json['request'] == 'createKey':    # 请求创建sshkey
             ret = self.createKey(msg_json['data'])
 
-        elif msg_json['request'] == 'config':       # 请求配置
+        elif msg_json['request'] == 'config':       # 请求配置 -- 现在已经不用
             ret = self.config(msg_json['data'])
 
         elif msg_json['request'] == 'upload':       # 请求上传文件
-            pass
+            clt = self.findClientById( msg_json['data']['id'] )
+            if clt is None: return None
+            self.__read_list.remove(clt.chan)
+
+            remote_path = clt.getCurrentPath()
+            self.session( dict(id=msg_json['data']['id'], data='\x15\r') )
+
+            threading.Thread(target=self.upload, args=(clt, msg_json['data']['data'], remote_path)).start()
+            self.__read_list.append(clt.chan)
+
         elif msg_json['request'] == 'download':     # 请求下载文件
-            pass
+            clt = self.findClientById( msg_json['data']['id'] )
+            if clt is None: return None
+            self.__read_list.remove(clt.chan)
+
+            remote_path = clt.getCurrentPath()
+            self.session( dict(id=msg_json['data']['id'], data='\x15\r') )
+
+            threading.Thread(target=self.download, args=(clt, msg_json['data']['path'], msg_json['data']['data'], remote_path)).start()
+            self.__read_list.append( clt.chan )
 
         elif msg_json['request'] == 'app_close':    # app 退出
             self.app_close(msg_json['data'])
@@ -335,10 +352,9 @@ class WebSocketClient(object):
 
 
     def run(self):
-        self.sendFolderList()
-        self.readConfig()
         while(self.__run_state):
-            r,w,x = select.select(self.__read_list, self.__write_list, self.__exec_list, 100)
+            ''' 循环监听, 间隔时间为500ms '''
+            r,w,x = select.select(self.__read_list, self.__write_list, self.__exec_list, 0.5)
             if self.__fd in r:
                 self.message_read_handle()
             else:
@@ -371,8 +387,9 @@ class WebSocketServer(object):
             os.mkdir(config.key_dir, config.dir_mode)
         self.__logger = logger.Logger()
 
-    # def __del__(self):
-    #     self.__listenfd.close()
+    def __del__(self):
+        self.__logger.write_log(0, 'WebSocketServer is stop.')
+        self.__listenfd.close()
 
     def start(self):
         try:
@@ -382,8 +399,6 @@ class WebSocketServer(object):
         except socket.error as err:
             self.__logger.write_log(2, str(err))
             sys.exit(-1)
-
-        # os.system('nw ../.')
 
         # 持续监听, 直到websocket连接才退出
         wsc = None
@@ -397,5 +412,4 @@ class WebSocketServer(object):
                 self.__logger.write_log(0, "%s:%s is connect, but not websocket protocols." %clt_info)
                 clt.close()
 
-        self.__listenfd.close()
-        wsc.run()
+        return wsc
