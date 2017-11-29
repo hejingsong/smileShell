@@ -2399,6 +2399,9 @@ img.nav-close:hover {background-color:red;}
 #mycontentmenu li:hover { background:#E6EDF6; box-shadow: 0px 0px 1px #729fcf inset; }
 .select-box .remember-checkbox {     display: inline-block; height: inherit; width: inherit; margin-top: 10px; margin-left: 10px; }
 .remember-text { color: #ccc; margin-left: 300px; }
+@keyframes bounce-down { 25% {transform: translateY(-10px);} 50%, 100% {transform: translateY(0);} 75% {transform: translateY(10px);} }
+.up_down { display: inline; position: absolute; background: orange; color: white; font-weight: bold; z-index: 1000; top: 60px; left: 45%; border-radius: 10px; padding: 10px;
+            -webkit-animation: bounce-down 1.5s linear infinite; animation: bounce-down 1.5s linear infinite; }
 /*#mycontentmenu {position: fixed; border-radius: 2px; font-size: 15px;color: white; background-color:#333;z-index: 15;}
 #mycontentmenu li {height: 30px; line-height:30px;margin-bottom: 5px;padding: 0px 10px;}
 #mycontentmenu li:hover{background-color: #222;box-shadow: 0px 0px 5px #111 inset;}*/
