@@ -1979,6 +1979,7 @@ var Renderer = (function () {
             this._terminal.element.appendChild(this._terminal.rowContainer);
         }
         this._terminal.emit('refresh', { element: this._terminal.element, start: start, end: end });
+        this._terminal.emit('writedone');
     };
     ;
     return Renderer;

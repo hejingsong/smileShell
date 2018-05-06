@@ -16,7 +16,7 @@ conf_dir = base_dir + '/conf'
 down_dir = base_dir + '/download'
 key_dir  = base_dir + '/sshkey'
 
-sock_addr = 'localhost'
+sock_addr = '127.0.0.1'
 sock_port = 12345
 
 current_user = getpass.getuser()

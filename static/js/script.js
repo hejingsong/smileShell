@@ -21,7 +21,6 @@ var user_conf = {           //
 // var down_dir = '';          // 下载文件保存路径
 // var key_dir = '';           // sshKey保存路径
 
-
 /**
 *  Base64 encode / decode
 *
@@ -482,6 +481,7 @@ Ssh.prototype.createTerm = function () {
     this.termElement.onmousedown = function($event) {on_paste_handle($event, $term) };
     this.terminal.on('data', function($data) { $ssh.on_key_event($data); });
     this.terminal.on('resize', function(){ $ssh.on_resize(); });
+    this.terminal.on('writedone', function() { $ssh.write_done(); });
 }
 
 /**
@@ -637,6 +637,14 @@ Ssh.prototype.on_resize = function() {
     };
     var $data_str = JSON.stringify($data_json);
     wsc.write($data_str);
+}
+
+Ssh.prototype.write_done = function () {
+    var $cursor = document.getElementsByClassName('terminal-cursor')[wsc.clients.indexOf(this)];
+    s_command = prepareTextForClipboard($cursor.parentElement.textContent);
+    commands = s_command.split(' ', -1);
+    if ( commands.length == 0 ) return;
+    this.command_prompt = commands[0];
 }
 
 /**
@@ -1568,12 +1576,16 @@ function createDataFolder() {
 function createUpDownMessage( $msg ) {
     var $box = document.createElement('div');
     var $body = document.getElementsByTagName('body')[0];
+    var $body_width = window.innerWidth;
     $box.innerHTML = $msg;
     $box.className = 'up_down';
     window.setTimeout(function () {
         $box.remove();
     }, 3000);
     $body.appendChild( $box );
+    var $box_width = $box.clientWidth;
+    var $offsetX = $body_width / 2 - $box_width / 2;
+    $box.style.left = $offsetX + "px";
 }
 
 function prepareTextForClipboard(text) {

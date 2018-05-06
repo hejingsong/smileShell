@@ -363,6 +363,7 @@ class WebSocketClient(object):
         for clt in self.__clients:
             self.delClient(clt)
 
+
 class WebSocketServer(object):
     '''负责监听websocket连接, 成功握手之后退出'''
     __instance = None   
@@ -374,9 +375,6 @@ class WebSocketServer(object):
 
     def __init__(self):
         self.__listenfd = None
-        # 在前端已经实现
-        # if not os.path.exists(config.data_dir):
-        #     os.mkdir(config.data_dir, config.dir_mode)
         if not os.path.exists(config.conf_dir):
             os.mkdir(config.conf_dir, config.dir_mode)
         if not os.path.exists(config.down_dir):
