@@ -380,6 +380,7 @@ function Ssh($ipaddr, $port, $user, $pass, $priKey, $loginType) {
     this.termElement = null;
     this.logined = 0;       // 登录状态 0 - 未登录 1 - 已登录 2 - 重新登录
     this.command_prompt = '';   // 提示字符串
+    this.bInput = false;    // 当前是否处于输入状态
     this.ipaddr = $ipaddr;
     this.port = $port;
     this.user = $user;
@@ -590,8 +591,9 @@ Ssh.prototype.on_key_event = function ($data) {
         var $cursor = document.getElementsByClassName('terminal-cursor')[ wsc.clients.indexOf(this) ];
         this.command_prompt = prepareTextForClipboard($cursor.parentElement.textContent);
     }
-
+    this.bInput = true;
     if ( $data == '\r' ) {
+        this.bInput = false;
         var $cursor = document.getElementsByClassName('terminal-cursor')[ wsc.clients.indexOf(this) ];
         var $command = prepareTextForClipboard($cursor.parentElement.textContent);
         var $input = trim( $command.replace( this.command_prompt, '') );
@@ -640,11 +642,10 @@ Ssh.prototype.on_resize = function() {
 }
 
 Ssh.prototype.write_done = function () {
+    if ( this.bInput == true ) return false;
     var $cursor = document.getElementsByClassName('terminal-cursor')[wsc.clients.indexOf(this)];
     s_command = prepareTextForClipboard($cursor.parentElement.textContent);
-    commands = s_command.split(' ', -1);
-    if ( commands.length == 0 ) return;
-    this.command_prompt = commands[0];
+    this.command_prompt = s_command;
 }
 
 /**
