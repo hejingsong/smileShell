@@ -18,8 +18,6 @@ var user_conf = {           //
     'down_dir': '',
     'key_dir' : ''
 };
-// var down_dir = '';          // 下载文件保存路径
-// var key_dir = '';           // sshKey保存路径
 
 /**
 *  Base64 encode / decode
@@ -160,6 +158,7 @@ function init() {
     $app_min_btn.onclick = on_app_min;
     $app_max_btn.onclick = on_app_max;
     $app_cls_btn.onclick = on_app_close;
+    win.on('restore', on_app_restore);
 
     $app_conn_btn.onclick = on_click_conn;
     $app_fold_btn.onclick = on_click_fold;
@@ -242,6 +241,7 @@ function on_paste_handle($event, $sshclient) {
  */
 function WebSocketClient() {
     this.clients = new Array();
+    this.cur_ssh = null;            // 当前的终端
     this.conn = new WebSocket(localUrl);
     this.conn.onopen = this.on_open;
     this.conn.onclose = this.on_close;
@@ -364,11 +364,9 @@ WebSocketClient.prototype.getFolderList = function ( $data ) {
     }
 }
 
-/* 不再使用
-WebSocketClient.prototype.getConfig = function ( $data ) {
-    down_dir = $data['down_dir'];
-    key_dir = $data['key_dir'];
-}*/
+WebSocketClient.prototype.setCurSsh = function ( $ssh ) {
+    this.cur_ssh = $ssh;
+}
 
 /**
  * [Ssh 用于读取用户输入和WebSocketClient传来的数据]
@@ -417,6 +415,7 @@ Ssh.prototype.create = function ($nodeName) {
     }
 
     wsc.addClient(this);
+    wsc.setCurSsh(this);
 
     this.id = this.makeId();
     this.createNav($nodeName);
@@ -444,8 +443,11 @@ Ssh.prototype.createNav = function ( $nodeName ) {
 
     this.navElement = {'nav': $nav, 'img': $img, 'closeimg': $cloimg};
 
-    $cloimg.onclick = function() { $obj.destroy(); };
-    $navtext.onclick =  function() { $obj.focus(); };
+    $cloimg.onclick = function($event) { $event.stopPropagation(); $obj.destroy(); };
+    $nav.onclick = function () {
+        wsc.setCurSsh($obj);
+        $obj.focus();
+    };
 }
 
 /**
@@ -464,9 +466,10 @@ Ssh.prototype.createTerm = function () {
 
     this.terminal = new Terminal({
         cols: 121,
-        cursorBlink: 5,
+        handler: function ($data) { $ssh.on_key_event($data); },
         scrollback: 1024,
-        tabStopWidth: 4
+        cursorBlink: 5,
+        tabStopWidth: 4,
     });
 
     this.terminal.open(this.termElement);
@@ -480,7 +483,6 @@ Ssh.prototype.createTerm = function () {
     this.termElement.onclick = hideMenu;
     this.termElement.onmouseup = on_copy_handle;
     this.termElement.onmousedown = function($event) {on_paste_handle($event, $term) };
-    this.terminal.on('data', function($data) { $ssh.on_key_event($data); });
     this.terminal.on('resize', function(){ $ssh.on_resize(); });
     this.terminal.on('writedone', function() { $ssh.write_done(); });
 }
@@ -553,21 +555,25 @@ Ssh.prototype.write = function (msg) {
  * [destroy 销毁客户端]
  */
 Ssh.prototype.destroy = function () {
-    var $id = 0;
+    var $idx = 0;
+    var $ssh = null;
     this.termElement.remove();
     this.navElement.nav.remove();
     this.terminal.destroy();
-    $id = wsc.delClient(this);
+    $idx = wsc.delClient(this);
     if ( wsc.clients.length == 0 ) {
         var $body = document.getElementsByTagName('body')[0];
         $body.style.backgroundColor = '#444';
+        wsc.setCurSsh(null);
         return;
     }
-    if ( $id == wsc.clients.length ) {
-        wsc.clients[ $id-1 ].focus();
+    if ($idx == wsc.clients.length) {
+        $ssh = wsc.clients[$idx - 1];
     }else {
-        wsc.clients[ $id ].focus();
+        $ssh = wsc.clients[$idx];
     }
+    $ssh.focus();
+    wsc.setCurSsh($ssh);
 }
 
 /**
@@ -586,7 +592,6 @@ Ssh.prototype.on_key_event = function ($data) {
     }
 
     // 如果提示符为空, 表示刚开始登录, 获取登录提示符
-    
     if ( this.command_prompt == '' ) {
         var $cursor = document.getElementsByClassName('terminal-cursor')[ wsc.clients.indexOf(this) ];
         this.command_prompt = prepareTextForClipboard($cursor.parentElement.textContent);
@@ -644,6 +649,7 @@ Ssh.prototype.on_resize = function() {
 Ssh.prototype.write_done = function () {
     if ( this.bInput == true ) return false;
     var $cursor = document.getElementsByClassName('terminal-cursor')[wsc.clients.indexOf(this)];
+    if ($cursor.parentElement !== undefined) return false;
     s_command = prepareTextForClipboard($cursor.parentElement.textContent);
     this.command_prompt = s_command;
 }
@@ -1254,6 +1260,12 @@ function on_app_close() {
     wsc.write( $data_str );
     // 关闭窗口
     win.close();
+}
+
+function on_app_restore() {
+    if (wsc.cur_ssh) {
+        wsc.cur_ssh.focus();
+    }
 }
 
 /**
