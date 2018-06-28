@@ -10,6 +10,7 @@ import config
 import logger
 
 class Ssh(object):
+
     def __init__(self, **kwargs):
         self.id = kwargs['id']
         self.host = kwargs['host']
@@ -44,7 +45,6 @@ class Ssh(object):
                     port=int(self.port),
                     username=self.user,
                     password=self.passwd
-                    # timeout=1.5         # 这里不能链接太长时间, 不然会阻塞整个进程
                 )
             else:
                 # 秘钥登录
@@ -57,6 +57,7 @@ class Ssh(object):
                     timeout=1.5         # 这里不能链接太长时间, 不然会阻塞整个进程
                 )
             self.chan = self.clt.invoke_shell(term='xterm', width=self.cols, height=self.rows)
+            self.chan.setblocking(0)
         except socket.error as e:
             ret['status'] = False
             ret['data'] = u'Connection ssh server failed. Please check the host and port.'
@@ -113,11 +114,11 @@ class Ssh(object):
             else:
                 key.write_private_key(privateFp, password=str.encode(passwd.encode()))
         except IOError as e:
-            write_error( "error: gen key, " + str(e) )
+            logger.write_log( 2, "error: gen key, " + str(e) )
             ret['status'] = False
             ret['msg'] = 'there was an error writing to the file'
         except paramiko.SSHException:
-            write_error( "error: gen key, " + str(e) )
+            logger.write_log(2, "error: gen key, " + str(e))
             ret['status'] = False
             ret['msg'] = 'the key is invalid'
         else:
@@ -136,6 +137,7 @@ class Ssh(object):
         data = ''
         recvData = ''
         try:
+            self.chan.setblocking(1)
             self.chan.sendall('\x15pwd\r')
             while 1:
                 data = self.chan.recv(1)
@@ -152,10 +154,13 @@ class Ssh(object):
         except:
             self.__logger.write_log(2, 'can\'t found current path.')
             return '~'
+        finally:
+            self.chan.setblocking(0)
 
     def upload(self, fileName, remote_path):
         file = fileName.split('/')[-1]
         data = u'%s 上传成功'%(file, )
+        sftpClient = None
         try:
             sftpClient = paramiko.SFTPClient.from_transport(self.clt.get_transport())
             sftpClient.put(fileName, remote_path+'/'+file)
@@ -166,12 +171,14 @@ class Ssh(object):
             data = str(e)
             self.__logger.write_log(2, data)
         finally:
-            sftpClient.close()
+            if sftpClient:
+                sftpClient.close()
         return data
 
     def download(self, path, fileName, remote_path):
         data = ''
         remoteFile = ''
+        sftpClient = None
         if fileName[0] == '/':
             remoteFile = fileName
         else:
@@ -189,5 +196,6 @@ class Ssh(object):
             data = str(e)
             self.__logger.write_log(2, data)
         finally:
-            sftpClient.close()
+            if sftpClient:
+                sftpClient.close()
         return data

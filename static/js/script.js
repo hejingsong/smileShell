@@ -14,7 +14,7 @@ var dataDir = '';           // 保存用户数据文件夹
 var dataFile = '';          // 用户保存的数据
 var confDir = '';           // 用户配置文件夹
 var confFile = '';          // 用户配置文件名
-var user_conf = {           // 
+var user_conf = {           // 用户配置
     'down_dir': '',
     'key_dir' : ''
 };
@@ -243,6 +243,7 @@ function WebSocketClient() {
     this.clients = new Array();
     this.cur_ssh = null;            // 当前的终端
     this.conn = new WebSocket(localUrl);
+    this.conn.binaryType = "arraybuffer";
     this.conn.onopen = this.on_open;
     this.conn.onclose = this.on_close;
     this.conn.onerror = this.on_error;
@@ -466,7 +467,6 @@ Ssh.prototype.createTerm = function () {
 
     this.terminal = new Terminal({
         cols: 121,
-        handler: function ($data) { $ssh.on_key_event($data); },
         scrollback: 1024,
         cursorBlink: 5,
         tabStopWidth: 4,
@@ -474,6 +474,9 @@ Ssh.prototype.createTerm = function () {
 
     this.terminal.open(this.termElement);
     this.terminal.fit();
+    this.terminal.on('data', function ($data) {
+        $ssh.on_key_event($data);
+    });
 
     for ( var $i = 0; $i < $terms.length; $i++ ) {
         $terms[$i].style.zIndex = -1;
@@ -491,6 +494,8 @@ Ssh.prototype.createTerm = function () {
  * [login 向后端发送登录信息]
  */
 Ssh.prototype.login = function () {
+    this.navElement.img.src = 'static/img/load.png';
+    this.navElement.img.className = 'load';
     var $login_json = {
         'request': 'login',
         'data': {
@@ -505,10 +510,13 @@ Ssh.prototype.login = function () {
             'loginType': this.loginType
         }
     };
-    this.navElement.img.src = 'static/img/load.png';
-    this.navElement.img.className = 'load';
     var $login_str = JSON.stringify($login_json);
-    wsc.write($login_str);
+    var $iLen = $login_str.length;
+    var $sLen = $iLen.toString();
+    var $buffer = Buffer.alloc($iLen + 4, ' ');
+    $buffer.write($sLen, 0, $sLen.length);
+    $buffer.write($login_str, 4);
+    wsc.write($buffer);
 }
 
 Ssh.prototype.logout = function() {
@@ -629,10 +637,18 @@ Ssh.prototype.on_key_event = function ($data) {
             'data': $data
         }
     };
-    $data_str = JSON.stringify($data_json);
-    wsc.write($data_str);
+    var $data_str = JSON.stringify($data_json);
+    var $iLen = $data_str.length;
+    var $sLen = $iLen.toString();
+    var $buffer = Buffer.alloc($iLen + 4, ' ');
+    $buffer.write($sLen, 0, $sLen.length);
+    $buffer.write($data_str, 4);
+    wsc.write($buffer);
 }
 
+/**
+ * 当terminal.write操作完成后的回调函数
+ */
 Ssh.prototype.on_resize = function() {
     var $data_json = {
         'request': 'resize',
@@ -643,13 +659,18 @@ Ssh.prototype.on_resize = function() {
         }
     };
     var $data_str = JSON.stringify($data_json);
-    wsc.write($data_str);
+    var $iLen = $data_str.length;
+    var $sLen = $iLen.toString();
+    var $buffer = Buffer.alloc($iLen + 4, ' ');
+    $buffer.write($sLen, 0, $sLen.length);
+    $buffer.write($data_str, 4);
+    wsc.write($buffer);
 }
 
 Ssh.prototype.write_done = function () {
     if ( this.bInput == true ) return false;
     var $cursor = document.getElementsByClassName('terminal-cursor')[wsc.clients.indexOf(this)];
-    if ($cursor.parentElement !== undefined) return false;
+    if ($cursor == undefined) return false;
     s_command = prepareTextForClipboard($cursor.parentElement.textContent);
     this.command_prompt = s_command;
 }
@@ -666,8 +687,13 @@ Ssh.prototype.on_upload_file = function($filename) {
             'data': ($filename == undefined)? '': $filename.replace(/\\/g, '/')
         }
     };
-    $data_str = JSON.stringify($data_json);
-    wsc.write($data_str);
+    var $data_str = JSON.stringify($data_json);
+    var $iLen = $data_str.length;
+    var $sLen = $iLen.toString();
+    var $buffer = Buffer.alloc($iLen + 4, ' ');
+    $buffer.write($sLen, 0, $sLen.length);
+    $buffer.write($data_str, 4);
+    wsc.write($buffer);
 }
 
 /**
@@ -684,8 +710,13 @@ Ssh.prototype.on_download_file = function($filename) {
             'data': ($filename == undefined)? '': $filename
         }
     };
-    $data_str = JSON.stringify($data_json);
-    wsc.write($data_str);
+    var $data_str = JSON.stringify($data_json);
+    var $iLen = $data_str.length;
+    var $sLen = $iLen.toString();
+    var $buffer = Buffer.alloc($iLen + 4, ' ');
+    $buffer.write($sLen, 0, $sLen.length);
+    $buffer.write($data_str, 4);
+    wsc.write($buffer);
 }
 
 /**
@@ -904,7 +935,12 @@ function createKey($key_type, $passwd) {
         }
     };
     var $data_str = JSON.stringify($data_json);
-    wsc.write($data_str);
+    var $iLen = $data_str.length;
+    var $sLen = $iLen.toString();
+    var $buffer = Buffer.alloc($iLen + 4, ' ');
+    $buffer.write($sLen, 0, $sLen.length);
+    $buffer.write($data_str, 4);
+    wsc.write($buffer);
 }
 
 /**
@@ -914,16 +950,6 @@ function createKey($key_type, $passwd) {
  */
 function config( $sshKeyPath, $downloadPath ) {
     if ( wsc == null ) return;
-    // 现在已经不用向后台发送配置命令
-    // var $data_json = {
-    //     'request': 'config',
-    //     'data': {
-    //         'sshKeyPath': $sshKeyPath,
-    //         'downloadPath': $downloadPath
-    //     }
-    // };
-    // var $data_str = JSON.stringify($data_json);
-    // wsc.write( $data_str );
 
     user_conf['down_dir'] = $downloadPath;
     user_conf['key_dir'] = $sshKeyPath;
@@ -1257,7 +1283,12 @@ function on_app_close() {
         'data': {}
     };
     var $data_str = JSON.stringify($data_json);
-    wsc.write( $data_str );
+    var $iLen = $data_str.length;
+    var $sLen = $iLen.toString();
+    var $buffer = Buffer.alloc($iLen + 4, ' ');
+    $buffer.write($sLen, 0, $sLen.length);
+    $buffer.write($data_str, 4);
+    wsc.write($buffer);
     // 关闭窗口
     win.close();
 }

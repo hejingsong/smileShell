@@ -5,7 +5,6 @@ import os
 import sys
 import json
 import time
-import pickle
 import struct
 import base64
 import select
@@ -32,7 +31,7 @@ class WebSocketClient(object):
 
     def __new__(self, *args, **kwargs):
         if not self.__instance:
-            self.__instance = object.__new__(self, *args, **kwargs)
+            self.__instance = super(WebSocketClient, self).__new__(self, *args, **kwargs)
         return self.__instance
 
     def __init__(self, fd):
@@ -100,12 +99,10 @@ class WebSocketClient(object):
         else:
             masks = data[2:6]
             data = data[6:]
-        i = 0  
-        raw_str = ''
 
-        for d in data:  
+        raw_str = ''
+        for i, d in enumerate(data):
             raw_str += chr(ord(d) ^ ord(masks[i%4]))
-            i += 1  
         return raw_str
 
     def sendMessage(self, msg):
@@ -147,7 +144,7 @@ class WebSocketClient(object):
             data=''
         )
         tmp_data = self.__fd.recv(128)
-        if len(tmp_data) <= 0:
+        if not tmp_data:
             return None
         if self.code_length == 0:
             self.get_data_length(tmp_data)
@@ -158,6 +155,11 @@ class WebSocketClient(object):
             return _buffer_json
         else:
             _buffer_utf8 = self.parse_data(self.data)
+            sLen = _buffer_utf8[:4]
+            sLen = sLen.strip()
+            if not sLen.isdigit(): return _buffer_json
+            iLen = int(sLen)
+            _buffer_utf8 = _buffer_utf8[4: 4+iLen+1]
             _buffer_unicode = str(_buffer_utf8).decode('utf-8', 'ignore')
         if len(self.data) == 0:
             _buffer_json['request'] = 'quit'
@@ -169,31 +171,6 @@ class WebSocketClient(object):
         self.code_length = 0
         self.data_len = 0
         return _buffer_json
-
-    def sendFolderList(self):
-        ''' 发送用户保存的链接, 现在已经不使用, 已经由前端nodejs完成 '''
-        response = dict(response='FolderList', data=None)
-        if os.path.exists(config.data_file):
-            with open(config.data_file, 'ab+') as fp:
-                data = pickle.load(fp)
-            response['data'] = data
-
-        self.sendMessage( json.dumps(response) )
-
-    def readConfig(self):
-        ''' 读取配置文件, 现在已经不使用, 已经由前端nodejs完成 '''
-        config_obj = dict(down_dir='', key_dir='')
-        if os.path.exists(config.conf_file):
-            with open(config.conf_file, 'rb') as fp:
-                line = fp.readline()
-                obj = line.split('=', 1)
-                config_obj[ obj[0].strip() ] = obj[1].strip()
-
-        if config_obj['down_dir'] != '':
-            config.down_dir = config_obj['down_dir']
-
-        if config_obj['key_dir'] != '':
-            config.key_dir = config_obj['key_dir']
 
     def addClient(self, clt):
         # 添加一个ssh连接
@@ -305,9 +282,6 @@ class WebSocketClient(object):
         elif msg_json['request'] == 'createKey':    # 请求创建sshkey
             ret = self.createKey(msg_json['data'])
 
-        elif msg_json['request'] == 'config':       # 请求配置 -- 现在已经不用
-            ret = self.config(msg_json['data'])
-
         elif msg_json['request'] == 'upload':       # 请求上传文件
             clt = self.findClientById( msg_json['data']['id'] )
             if clt is None: return None
@@ -370,7 +344,7 @@ class WebSocketServer(object):
 
     def __new__(self, *args, **kwargs):
         if not self.__instance:
-            self.__instance = object.__new__(self, *args, **kwargs)
+            self.__instance = super(WebSocketServer, self).__new__(self, *args, **kwargs)
         return self.__instance
 
     def __init__(self):

@@ -8,3 +8,4 @@ conf/
 sshKey/
 static/
 production/
+.vscode/

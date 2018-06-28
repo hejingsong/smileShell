@@ -4,19 +4,23 @@
 import time
 from config import log_dir
 
+def write_log(level, msg):
+    logger = Logger()
+    logger.write_log(level, msg)
+
 class Logger( object ):
     '''记录日志类'''
     __instance = None
     __log_level = ['Log', 'Debug', 'Error']
 
-    def __init__(self):
-        self.__fileName = '%s/%s.log' %(log_dir, time.strftime('%Y-%m-%d'))
-        self.__fd = open(self.__fileName, 'ab+', buffering=0)
-
     def __new__(self, *args, **kwargs):
         if not self.__instance:
             self.__instance = object.__new__(self, *args, **kwargs)
         return self.__instance
+
+    def __init__(self):
+        self.__fileName = '%s/%s.log' %(log_dir, time.strftime('%Y-%m-%d'))
+        self.__fd = open(self.__fileName, 'ab+', buffering=0)
 
     def __del__(self):
         self.__fd.close()
