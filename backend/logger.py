@@ -4,28 +4,38 @@
 import time
 from config import log_dir
 
-def write_log(level, msg):
-    logger = Logger()
-    logger.write_log(level, msg)
+g_Logger = None
 
-class Logger( object ):
+LOG = 0
+DEBUG = 1
+ERROR = 2
+
+def Init():
+    global g_Logger
+    g_Logger = CLogger()
+
+def write_log(level, msg):
+    global g_Logger
+    g_Logger.write_log(level, msg)
+
+class CLogger(object):
     '''记录日志类'''
-    __instance = None
+    instance_ = None
     __log_level = ['Log', 'Debug', 'Error']
 
-    def __new__(self, *args, **kwargs):
-        if not self.__instance:
-            self.__instance = object.__new__(self, *args, **kwargs)
-        return self.__instance
+    def __new__(cls):
+        if not cls.instance_:
+            cls.instance_ = object.__new__(cls)
+        return cls.instance_
 
     def __init__(self):
-        self.__fileName = '%s/%s.log' %(log_dir, time.strftime('%Y-%m-%d'))
-        self.__fd = open(self.__fileName, 'ab+', buffering=0)
+        self.fileName = '%s/%s.log' %(log_dir, time.strftime('%Y-%m-%d'))
+        self.fd = open(self.fileName, 'ab+', buffering=0)
 
-    def __del__(self):
-        self.__fd.close()
+    def destroy(self):
+        self.fd.close()
 
     def write_log(self, level, msg):
         current_time = time.strftime('%H:%M:%S')
         write_msg = "[%s]\t[%s]\t%s\r\n" % (self.__log_level[level], current_time, msg)
-        self.__fd.write(write_msg)
+        self.fd.write(write_msg)

@@ -24,4 +24,6 @@ hostname = socket.gethostname()
 
 data_file = "%s/%s.dat" % (data_dir, current_user)
 conf_file = '%s/%s.conf' % (conf_dir, current_user)
-        
+
+BUFFER_SIZE = 16
+REQUEST_LOGIN = 0

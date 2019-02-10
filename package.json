@@ -1,12 +1,12 @@
 {
     "name": "SmileShell",
     "main": "index.html",
-    "version": "1.6.2",
+    "version": "1.6.4",
     "author": "nisonGe",
     "window": {
         "toolbar": false,
         "width": 1000,
-        "height": 600,
+        "height": 597,
         "icon": "static/img/smile.png",
         "positon":"center",
         "resizable":true,

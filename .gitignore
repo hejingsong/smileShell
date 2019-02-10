@@ -1,3 +1,4 @@
+*.tags*
 *.log
 *.pyc
 *.bin
@@ -9,3 +10,4 @@ sshKey/
 static/
 production/
 .vscode/
+*sublime-*
