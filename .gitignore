@@ -7,7 +7,6 @@ data/
 download/
 conf/
 sshKey/
-static/
 production/
 .vscode/
 *sublime-*

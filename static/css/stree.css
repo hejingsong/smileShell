@@ -1,0 +1,59 @@
+@charset "UTF-8";
+/**
+ * 
+ * @authors Hejs (240197153@qq.com)
+ * @date    2018-07-03
+ */
+
+.folder-content a{ 
+    color:#ccc; 
+    text-decoration:none; 
+}
+
+/* 菜单 */
+.folder-content ul{ 
+    padding:0 0 0 18px; 
+    margin:0; 
+}
+
+/* 菜单项 */
+.folder-content ul li{ 
+    font-size:13px; 
+    color:white; 
+    line-height:18px; 
+    cursor:default;
+    list-style:none; 
+    background:url(static/img/st_node.gif); 
+    background-repeat:no-repeat; 
+    padding:0 5px 0px 20px;
+    margin-bottom: 5px;
+    display: block;
+    border-radius: 5px;
+}
+
+/* 子菜单 */
+.folder-content ul li ul{}
+
+/* 子菜单项 */
+.folder-ntent ul li ul li{}
+
+/* 子菜单的父节点 */
+.folder-content .folder{ 
+    list-style-image:url(static/img/st_icon.png); 
+    background:url(static/img/st_folder.gif); 
+    background-repeat:no-repeat; 
+    padding:0 0 0 20px; 
+}
+
+/* 展开的父节点 */
+.folder-content .open{ 
+    list-style-image:url(static/img/st_icon_open.png); 
+    background:url(static/img/st_folder_open.gif); 
+    background-repeat:no-repeat; 
+    padding:0 0 0 20px; 
+}
+
+.folder-content ul li:hover{
+    background-color:#222;
+    color: #ccc;
+}

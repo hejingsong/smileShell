@@ -58,7 +58,7 @@ class CPacket(object):
         self.buffer += chr(d)
     
     def packet_string(self, data, len):
-        self.buffer += data.encode('utf8')
+        self.buffer += data
     
     def unpacket_uint8(self):
         self.offset += 1
@@ -86,7 +86,7 @@ class CPacket(object):
         for i in xrange(length):
             data += chr(self.buffer[self.offset + i])
         self.offset += length
-        return data.encode('utf8')
+        return data.decode('utf8')
 
 
 class CProxy(basesocket.CBaseSocket):
@@ -168,14 +168,15 @@ class CProxy(basesocket.CBaseSocket):
             oLoop.add(oSsh, oLoop.EVENT_READ)
             oLoop.add(oSsh, oLoop.EVENT_WRITE)
             self.sshs[term_id] = oSsh
-        msg_len = len(ret['data'])
+        data = ret['data'].encode('utf8')
+        msg_len = len(data)
         total_len = 1 + 1 + 1 + 4 + msg_len
         oPacket = CPacket('')
         oPacket.packet_uint8(P_LOGIN)
         oPacket.packet_uint8(ret['term_id'])
         oPacket.packet_uint8(ret['status'])
         oPacket.packet_uint32(msg_len)
-        oPacket.packet_string(ret['data'], msg_len)
+        oPacket.packet_string(data, msg_len)
         self.write_buffer.append(oPacket)
 
     def session(self, packet, oLoop):
@@ -193,6 +194,7 @@ class CProxy(basesocket.CBaseSocket):
         oSsh.force_exit(oLoop)
 
     def add_ssh_message(self, term_id, data):
+        data = data.encode('utf8')
         msg_len = len(data)
         oPacket = CPacket('')
         oPacket.packet_uint8(P_SESSION)
