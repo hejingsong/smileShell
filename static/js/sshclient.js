@@ -43,6 +43,33 @@ function str2utf8(str) {
   return back;
 }
 
+function initbyte(array) {
+  for (var i = 0; i < array.length; i++) {
+    array[i] &= 0xff;
+  }
+  return array;
+}
+
+function utf82str(arr) {
+  var UTF = '', _arr = initbyte(arr);
+  for (var i = 0; i < _arr.length; i++) {
+    var one = _arr[i].toString(2),
+        v = one.match(/^1+?(?=0)/);
+    if (v && one.length == 8) {
+      var bytesLength = v[0].length;
+      var store = _arr[i].toString(2).slice(7 - bytesLength);
+      for (var st = 1; st < bytesLength; st++) {
+        store += _arr[st + i].toString(2).slice(2)
+      }
+      UTF += String.fromCharCode(parseInt(store, 2));
+      i += bytesLength - 1
+    } else {
+      UTF += String.fromCharCode(_arr[i])
+    }
+  }
+  return UTF
+}
+
 
 function CPacket(data=null, size=0) {
   this.offset = 0;
@@ -100,22 +127,12 @@ CPacket.prototype.unpacket_uint32 = function() {
 }
 
 CPacket.prototype.unpacket_string = function(len) {
+  let codes = [];
   let data = '';
-  let code = 0;
-  let code1 = 0, code2 = 0;
-  let s = '';
-  for (let i = 0; i < len; ++i) {
-    code = this.buffer[this.offset + i];
-    if (code < 128)
-      data += String.fromCharCode(code);
-    else {
-      code1 = this.buffer[this.offset + i + 1];
-      code2 = this.buffer[this.offset + i + 2];
-      s = '%'+code.toString(16)+'%'+code1.toString(16)+'%'+code2.toString(16);
-      data += decodeURI(s);
-      i += 2;
-    }
+  for (let i = 0; i < len; i++) {
+    codes.push(this.buffer[this.offset + i]);
   }
+  data = utf82str(codes);
   this.offset += len;
   return data;
 }

@@ -215,7 +215,6 @@ class CProxy(basesocket.CBaseSocket):
         back_str = []
         back_str.append('\x82')
         data_length = len(message)
-
         if data_length <= 125:
             back_str.append(chr(data_length))
         elif data_length <= 65535:
@@ -230,7 +229,6 @@ class CProxy(basesocket.CBaseSocket):
             data += c
 
         back_str = str(data) + message
-
         if back_str != None and len(back_str) > 0:
             self.fd.sendall(back_str)
 
