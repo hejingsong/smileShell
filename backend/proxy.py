@@ -192,6 +192,7 @@ class CProxy(basesocket.CBaseSocket):
         oSsh = self.sshs.get(term_id)
         if not oSsh: return
         oSsh.force_exit(oLoop)
+        self.sshs.pop(term_id)
 
     def add_ssh_message(self, term_id, data):
         data = data.encode('utf8')
@@ -208,6 +209,7 @@ class CProxy(basesocket.CBaseSocket):
         oPacket.packet_uint8(P_LOGOUT)
         oPacket.packet_uint8(term_id)
         self.write_buffer.append(oPacket)
+        self.sshs.pop(term_id)
     
     def write_(self, sMsg):
         # 发送字符串
