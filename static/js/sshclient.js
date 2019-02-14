@@ -237,6 +237,7 @@ CSshClient.prototype.force_exit = function(term_id) {
   packet.packet_uint8(term_id);
   this.send(packet);
   delete packet;
+  this.remove_event(term_id);
 }
 
 CSshClient.prototype.resize = function(data) {
@@ -316,6 +317,7 @@ CSshClient.prototype.rep_logout_ = function(packet) {
   let data = {
     term_id: term_id
   };
+  this.remove_event(term_id);
   return data;
 }
 

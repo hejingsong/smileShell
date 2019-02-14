@@ -195,12 +195,16 @@ class CProxy(basesocket.CBaseSocket):
         oSsh = self.sshs.get(term_id)
         if not oSsh: return
         oSsh.force_exit(oLoop)
+<<<<<<< HEAD
     
     def resize(self, packet, oLoop):
         row = packet.unpacket_uint16()
         col = packet.unpacket_uint16()
         for term_id, oSsh in self.sshs.iteritems():
             oSsh.resize(row, col)
+=======
+        self.sshs.pop(term_id)
+>>>>>>> 47f8a7a432e81cf844da81a65ff7927524e20629
 
     def add_ssh_message(self, term_id, data):
         data = data.encode('utf8')
