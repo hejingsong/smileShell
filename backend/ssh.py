@@ -117,7 +117,7 @@ class CSsh(basesocket.CBaseSocket):
         self.clt.close()
         oLoop.remove(self)
 
-    def resize(self, cols, rows):
+    def resize(self, rows, cols):
         self.chan.resize_pty(width=cols, height=rows)
 
     @staticmethod

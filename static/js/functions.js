@@ -8,6 +8,7 @@ PROTOCOL = {
   P_SESSION   : 0x03,
   P_LOGOUT    : 0x04,
   P_FORCE_EXIT: 0x05,
+  P_RESIZE    : 0x06,
 };
 
 

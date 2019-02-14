@@ -9,6 +9,7 @@
  * login: 主协议(1字节) + 终端编号(1字节) + 远程主机长度(1字节) + 远程主机 + 端口(2字节) + 登陆类型(1字节) + 用户名长度(1字节) + 用户名 + 密码/密钥长度(4字节) + 密码/密钥 + row(两个字节) + col(两个字节)
  * session: 主协议(1字节) + 终端编号(1字节) + 信息长度(4字节) + 信息
  * force_exit: 主协议(1字节) + 终端编号(1字节)
+ * resize: 主协议(1字节) + row(两个字节) + col(两个字节)
  */
 
 /**
@@ -234,6 +235,16 @@ CSshClient.prototype.force_exit = function(term_id) {
   let packet = new CPacket(null, total_len);
   packet.packet_uint8(func.PROTOCOL.P_FORCE_EXIT);
   packet.packet_uint8(term_id);
+  this.send(packet);
+  delete packet;
+}
+
+CSshClient.prototype.resize = function(data) {
+  let total_len = 1 + 2 + 2;
+  let packet = new CPacket(null, total_len);
+  packet.packet_uint8(func.PROTOCOL.P_RESIZE);
+  packet.packet_uint16(data.row);
+  packet.packet_uint16(data.col);
   this.send(packet);
   delete packet;
 }

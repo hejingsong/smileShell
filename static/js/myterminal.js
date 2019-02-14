@@ -4,6 +4,7 @@ var func = require('./functions.js');
 // 为了简便，标签页也有这个类控制
 function CMyTerminal(manager) {
   this.container = null;
+  this.nav_container = null;
   this.nav = null;
   this.nav_img = null;
   this.nav_cls_btn = null;
@@ -26,6 +27,9 @@ CMyTerminal.prototype.create = function(term, parent, on_key_event) {
   });
   this.terminal = term;
   this.container = container;
+  if (this.manager.get_terminal_num() == 0) {
+    this.container.style.background = '#000';
+  }
 }
 
 CMyTerminal.prototype.create_nav = function(parent, title, force_exit_func) {
@@ -60,6 +64,10 @@ CMyTerminal.prototype.create_nav = function(parent, title, force_exit_func) {
   this.nav = nav;
   this.nav_img = img;
   this.nav_cls_btn = cls_img;
+  this.nav_container = parent;
+  if (this.manager.get_terminal_num() == 0) {
+    this.nav_container.style.display = 'block';
+  }
 }
 
 CMyTerminal.prototype.set_inactive = function() {
@@ -79,6 +87,10 @@ CMyTerminal.prototype.destroy = function() {
   this.nav.remove();
   this.terminal.destroy();
   delete this.terminal;
+  if (this.manager.get_terminal_num() == 1) {
+    this.nav_container.style.display = 'none';
+    this.container.style.background = '';
+  }
 }
 
 CMyTerminal.prototype.write = function(data) {
@@ -96,6 +108,17 @@ CMyTerminal.prototype.on_login_response = function(status, msg) {
   }else {
     this.nav_img.src = 'static/img/false.png';
     this.terminal.write('***** \033[40;36m'+msg+'\033[0m *****\r\n');
+  }
+}
+
+CMyTerminal.prototype.resize = function() {
+  this.terminal.fit();
+}
+
+CMyTerminal.prototype.get_size = function() {
+  return {
+    row: this.terminal.rows,
+    col: this.terminal.cols,
   }
 }
 
@@ -159,6 +182,19 @@ CTerminalManager.prototype.remove_terminal = function(term_id) {
     this.active_term_id = t_id;
     return;
   }
+}
+
+CTerminalManager.prototype.get_terminal_num = function() {
+  return Object.keys(this.terminals).length;
+}
+
+CTerminalManager.prototype.resize = function() {
+  let term_id = -1;
+  for (term_id in this.terminals) {
+    this.terminals[term_id].resize();
+  }
+  if (term_id == -1) return null;
+  return this.terminals[term_id].get_size();
 }
 
 

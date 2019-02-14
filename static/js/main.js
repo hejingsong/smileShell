@@ -29,6 +29,7 @@ function CWindow() {
   this.is_max_window = false;
   this.client = null;
   this.terminal_manager = null;
+  this.folders = {};
 }
 
 CWindow.prototype.init = function() {
@@ -56,11 +57,11 @@ CWindow.prototype.init = function() {
   app_fold_btn.onclick = () => { obj.folder(); };
   app_set_btn.onclick  = () => { obj.setting(); };
   app_key_btn.onclick  = () => { obj.create_key(); };
+  window.onresize      = () => { obj.on_resize() };
   for (let btn of box_cls_btns) {
     btn.onclick = f;
   }
   
-  window.onresize      = () => { obj.on_resize() };
   func.hover(app_menu_btn, () => { this.open_menu(app_menu_box); }, () => { this.close_menu(app_menu_box); } );
 
   if (DEBUG) {
@@ -71,7 +72,9 @@ CWindow.prototype.init = function() {
 }
 
 CWindow.prototype.on_resize = function() {
-
+  let data = this.terminal_manager.resize();
+  if (!data) return;
+  this.client.resize(data);
 }
 
 CWindow.prototype.minimize = function() {
@@ -108,14 +111,14 @@ CWindow.prototype.quick_connect = function () {
   let obj = this;
   let full_box = document.getElementsByClassName('full-box')[0];
   let box = document.getElementsByClassName('msg-content')[0];
+  let confirm_btn = document.getElementsByClassName('confirm-btn')[0];
+  let title = document.getElementsByClassName('msg-title')[0];
   let host_box = document.createElement('div');
   let host_input = document.createElement('input');
   let port_input = document.createElement('input');
   let user_box = document.createElement('div');
   let user_input = document.createElement('input');
   let pass_input = document.createElement('input');
-  let confirm_btn = document.getElementsByClassName('confirm-btn')[0];
-  let title = document.getElementsByClassName('msg-title')[0];
 
   host_box.className = 'host-info';
   user_box.className = 'user-info';
@@ -153,7 +156,34 @@ CWindow.prototype.quick_connect = function () {
 }
 
 CWindow.prototype.folder = function () {
+  let folder_btn = document.createElement('div');
+  let folder_ul = document.createElement('ul');
+  let add_btn = document.createElement('img');
+  let mod_btn = document.createElement('img');
+  let del_btn = document.createElement('img');
+  let full_box = document.getElementsByClassName('full-box')[0];
+  let box = document.getElementsByClassName('msg-content')[0];
+  let confirm_btn = document.getElementsByClassName('confirm-btn')[0];
+  let title = document.getElementsByClassName('msg-title')[0];
 
+  folder_btn.className = 'folder-content-btn';
+  folder_ul.id = 'folder-list';
+  add_btn.src = 'static/img/add.png';
+  add_btn.title = '新建';
+  mod_btn.src = 'static/img/modify.png';
+  mod_btn.title = '修改';
+  del_btn.src = 'static/img/close.png'; 
+  del_btn.title = '删除';
+  title.innerHTML = '连接列表';
+
+  folder_btn.appendChild(add_btn);
+  folder_btn.appendChild(mod_btn);
+  folder_btn.appendChild(del_btn);
+
+  box.appendChild(folder_btn);
+  box.appendChild(folder_ul);
+
+  full_box.style.display = 'block';
 }
 
 CWindow.prototype.setting = function () {

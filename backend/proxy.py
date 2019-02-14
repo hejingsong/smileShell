@@ -13,6 +13,7 @@ import basesocket
 login: 主协议(1字节) + 终端编号(1字节) + 远程主机长度(1字节) + 远程主机 + 端口(2字节) + 登陆类型(1字节) + 用户名长度(1字节) + 用户名 + 密码/密钥长度(4字节) + 密码/密钥 + row(两个字节) + col(两个字节)
 session: 主协议(1字节) + 终端编号(1字节) + 信息长度(4字节) + 信息
 force_exit: 主协议(1字节) + 终端编号(1字节)
+resize: 主协议(1字节) + row(两个字节) + col(两个字节)
 """
 
 """
@@ -28,6 +29,7 @@ P_LOGIN         = 0x02          # 登陆协议
 P_SESSION       = 0x03          # 会话协议
 P_LOGOUT        = 0x04          # 登出协议
 P_FORCE_EXIT    = 0x05          # 强制退出协议
+P_RESIZE        = 0x06          # 终端改变大小协议
 
 
 class CPacket(object):
@@ -112,7 +114,8 @@ class CProxy(basesocket.CBaseSocket):
             P_EXIT          : 'exit',
             P_LOGIN         : 'login',
             P_SESSION       : 'session',
-            P_FORCE_EXIT    : 'force_exit'
+            P_FORCE_EXIT    : 'force_exit',
+            P_RESIZE        : 'resize',
         }
         super(CProxy, self).__init__(oSocket)
 
@@ -192,6 +195,12 @@ class CProxy(basesocket.CBaseSocket):
         oSsh = self.sshs.get(term_id)
         if not oSsh: return
         oSsh.force_exit(oLoop)
+    
+    def resize(self, packet, oLoop):
+        row = packet.unpacket_uint16()
+        col = packet.unpacket_uint16()
+        for term_id, oSsh in self.sshs.iteritems():
+            oSsh.resize(row, col)
 
     def add_ssh_message(self, term_id, data):
         data = data.encode('utf8')
@@ -208,6 +217,7 @@ class CProxy(basesocket.CBaseSocket):
         oPacket.packet_uint8(P_LOGOUT)
         oPacket.packet_uint8(term_id)
         self.write_buffer.append(oPacket)
+        self.sshs.pop(term_id)
     
     def write_(self, sMsg):
         # 发送字符串
