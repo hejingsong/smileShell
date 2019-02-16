@@ -53,7 +53,7 @@ img.nav-close:hover {background-color:red;}
 .conn-btn button,.new-btn button,.mod-btn button,.setting-btn button,.private-btn button {height: 32px;width: 50px;margin-right: 10px;background:transparent;border: none;color: white;border-radius:5px;padding:2px 5px;}
 .conn-btn button:hover,.new-btn button:hover,.mod-btn button:hover,.setting-btn button:hover,.private-btn button:hover{background:#222;box-shadow: 0px 0px 2px #000 inset;}
 .host-info{text-align: center;}
-.keyTypeBox { text-align: left; color: white; width: 270px; margin: 0px auto 20px auto;}
+.keyTypeBox { text-align: left; color: white; width: 270px; margin: 10px auto 10px auto;}
 .keyTypeBox select {margin-left: 40px;}
 .logo {height: 130px; width: 130px; margin: 150px auto; background:url('/static/img/icon.png') no-repeat;}
 *::-webkit-scrollbar{width: 16px;height: 16px;background-color: #555;border-radius:5px;}  
@@ -89,5 +89,6 @@ img.nav-close:hover {background-color:red;}
 @keyframes bounce-down { 25% {transform: translateY(-10px);} 50%, 100% {transform: translateY(0);} 75% {transform: translateY(10px);} }
 .up_down { display: inline; position: absolute; background: orange; color: white; font-weight: bold; z-index: 1000; top: 60px; left: 45%; border-radius: 10px; padding: 10px;
             -webkit-animation: bounce-down 1.5s linear infinite; animation: bounce-down 1.5s linear infinite; }
-#currentNode {background-color: orange;color:black;}
+#currentNode {background-color: orange;color:black !important;}
 .menu { transition: width 0.5s, height 0.5s; -webkit-transition:width 0.5s, height 0.5s; }
+#folder-list li {color: white; box-shadow: 0px 0px 2px #999; padding: 2px 10px; border-radius: 5px; margin-bottom: 2px;}

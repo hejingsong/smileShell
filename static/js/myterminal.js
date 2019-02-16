@@ -1,5 +1,5 @@
 
-var func = require('./functions.js');
+var func = require('./functions');
 
 // 为了简便，标签页也有这个类控制
 function CMyTerminal(manager) {
@@ -25,11 +25,34 @@ CMyTerminal.prototype.create = function(term, parent, on_key_event) {
   term.on('data', function (data) {
     on_key_event(self, data);
   });
+  this.on_key_event = on_key_event;
   this.terminal = term;
   this.container = container;
   if (this.manager.get_terminal_num() == 0) {
     this.container.style.background = '#000';
   }
+  this.container.onmouseup = (evt) => { this.copy_handler(evt); };
+  this.container.onmousedown = (evt) => { this.paste_handler(evt) };
+}
+
+CMyTerminal.prototype.copy_handler = function(evt) {
+  if ( evt.button != 0 ) {
+    return false;
+  }
+  let copiedText = this.manager.win.getSelection().toString()
+      , text = func.prepareTextForClipboard(copiedText);
+  if ( text == '' ) { return false; }
+  this.manager.clipboard.set(text, 'text');
+  evt.preventDefault();
+}
+
+CMyTerminal.prototype.paste_handler = function(evt) {
+  if ( evt.button != 2 ) 
+    return false;
+  evt.stopPropagation();
+  let text = this.manager.clipboard.get('text');
+  if ( text == '' ) return false;
+  this.on_key_event(this, text);
 }
 
 CMyTerminal.prototype.create_nav = function(parent, title, force_exit_func) {
@@ -122,9 +145,14 @@ CMyTerminal.prototype.get_size = function() {
   }
 }
 
+CMyTerminal.prototype.focus = function() {
+  this.terminal.focus();
+}
 
-function CTerminalManager(logger) {
-  this.logger = logger;
+
+function CTerminalManager(win, clipboard) {
+  this.win = win;
+  this.clipboard = clipboard;
   this.active_term_id = 0;
   this.terminals = {};
 }
@@ -195,6 +223,12 @@ CTerminalManager.prototype.resize = function() {
   }
   if (term_id == -1) return null;
   return this.terminals[term_id].get_size();
+}
+
+CTerminalManager.prototype.focus = function() {
+  let term = this.terminals[this.active_term_id];
+  if (!term) return;
+  term.focus();
 }
 
 

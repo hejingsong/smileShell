@@ -5,17 +5,222 @@
 /**
  * 全局变量定义
  */
-var DEBUG = true;
+var DEBUG = false;
 var appPath = require('path');
 var gui = require('nw.gui');
 var g_win = gui.Window.get();
-g_win.showDevTools();
-var sshclient = require('./static/js/sshclient.js');
-var terminal = require('./static/js/myterminal.js');
-var func = require('./static/js/functions.js');
+if (DEBUG)
+  g_win.showDevTools();
+var sshclient = require('./static/js/sshclient');
+var terminal = require('./static/js/myterminal');
+var func = require('./static/js/functions');
 
 var EXEC_STRING = "/backend/webSocketServer.exe";
 var URL = 'ws://127.0.0.1:12345';
+
+
+function create_select_file_box( file_input ) {
+  let select_input = document.createElement('input');
+
+  select_input.style.display = 'none';
+  select_input.type = 'file';
+  select_input.className = 'File';
+  select_input.onchange = function () {
+    file_input.value = select_input.value;
+    select_input.remove();
+  };
+  select_input.oncancel = () => {
+    select_input.remove();
+  }
+  select_input.click();
+}
+
+function create_select_folder_box( dir_input ) {
+  var select_input = document.createElement('input');
+
+  select_input.style.display = 'none';
+  select_input.nwdirectory = 'true';
+  select_input.type = 'file';
+
+  select_input.onchange = function(){
+      dir_input.value = select_input.value;
+      select_input.remove();
+  };
+  select_input.oncancel = () => {
+    select_input.remove();
+  };
+
+  select_input.click();
+}
+
+function create_folder_list_box(title, confirm_callback) {
+  let data = null;
+  if (arguments.length == 3) {
+    data = arguments[2];
+  }else {
+    data = {
+      name: '',
+      host: '',
+      port: '',
+      user: '',
+      pass: '',
+      priv: '',
+      login_type: 0,
+      remember: 0
+    };
+  }
+  let content = func.create_box(document.getElementsByTagName('body')[0], title);  
+  let full_box = content.full_box;
+  let box = content.content;
+  let confirm = content.confirm;
+  let name_box = document.createElement('div');
+  let name_input = document.createElement('input');
+  let host_box = document.createElement('div');
+  let host_input =  document.createElement('input');
+  let port_input = document.createElement('input');
+  let user_box = document.createElement('div');
+  let user_input = document.createElement('input');
+  let login_type_box = document.createElement('div');
+  let passwd_radio = document.createElement('input');
+  let private_radio = document.createElement('input');
+  let select_box = document.createElement('div');
+  let pass_input = document.createElement('input');
+  let private_input = document.createElement('input');
+  let file_btn = document.createElement('button');
+  let spantext1 = document.createElement('span');
+  let spantext2 = document.createElement('span');
+  let spantext3 = document.createElement('span');
+  let remember_input = document.createElement('input');
+
+  name_box.className = 'link-name';
+  name_input.type = 'text';
+  name_input.name = 'link-name';
+  name_input.value = data.name;
+  name_input.placeholder = '连接名';
+  host_box.className = 'host-info';
+  host_input.type = 'text';
+  host_input.name = 'host';
+  host_input.value = data.host;
+  host_input.placeholder = '主机地址';
+  port_input.type = 'text';
+  port_input.name = 'port';
+  port_input.value = data.port;
+  port_input.placeholder = '端口';
+  user_box.className = 'user-info';
+  user_input.type = 'text';
+  user_input.name = 'user';
+  user_input.value = data.user;
+  user_input.placeholder = '用户名';
+  login_type_box.className = 'login-type';
+  passwd_radio.type = 'radio';
+  passwd_radio.name = 'loginType';
+  private_radio.type = 'radio';
+  private_radio.name = 'loginType';
+  select_box.className = 'select-box';
+  pass_input.type = 'password';
+  pass_input.name = 'password';
+  pass_input.placeholder = '密码';
+  pass_input.value = data.pass;
+  private_input.type = 'text';
+  private_input.name = 'privateKey';
+  private_input.placeholder = '密钥路径';
+  private_input.readOnly = true;
+  private_input.value = data.priv;
+  file_btn.innerHTML = '..';
+  spantext1.innerHTML = '密码登录';
+  spantext2.innerHTML = '密钥登录';
+  spantext3.innerHTML = '记住密码';
+  spantext3.className = 'remember-text';
+  remember_input.type = 'checkbox';
+  remember_input.name = 'remember';
+  remember_input.className = 'remember-checkbox';
+  remember_input.checked = data.remember;
+
+  passwd_radio.onchange = () => {
+    func.remove_add_children(select_box);
+    pass_input.value = data.pass;
+    private_input.value = '';
+    select_box.appendChild(pass_input);
+    select_box.appendChild(spantext3);
+    select_box.appendChild(remember_input);
+  };
+
+  private_radio.onchange = () => {
+    func.remove_add_children(select_box);
+    private_input.value = data.priv;
+    pass_input.value = data.pass;
+    select_box.appendChild(private_input);
+    select_box.appendChild(file_btn);
+    select_box.appendChild(pass_input);
+    select_box.appendChild(spantext3);
+    select_box.appendChild(remember_input);
+  };
+
+  file_btn.onclick = () => {
+    create_select_file_box(private_input);
+  };
+
+  confirm.onclick = () => {
+    let name = name_input.value.trim();
+    let host = host_input.value.trim();
+    let port = port_input.value.trim();
+    let user = user_input.value.trim();
+    let login_type = passwd_radio.checked ? 0 : 1;
+    let priv = private_input.value === 'undefined' ? '' : private_input.value.trim();
+    let remember = remember_input.checked ? 1 : 0;
+    let pass = pass_input.value.trim();
+    if (name == '' || host == '' || user == '' || port == '' || isNaN(port)) {
+      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '输入不合法');
+      return;
+    }
+    if (login_type && priv == '') {
+      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '输入不合法');
+      return;
+    }
+    if (remember && pass == '') {
+      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '输入不合法');
+      return;
+    }
+    pass = remember ? pass : '';
+    confirm_callback(full_box, {
+      name: name,
+      host: host,
+      port: port,
+      user: user,
+      pass: pass,
+      priv: priv,
+      login_type: login_type,
+      remember: remember
+    });
+  };
+  name_box.appendChild(name_input);
+  host_box.appendChild(host_input);
+  host_box.appendChild(port_input);
+  user_box.appendChild(user_input);
+  login_type_box.appendChild(passwd_radio);
+  login_type_box.appendChild(spantext1);
+  login_type_box.appendChild(private_radio);
+  login_type_box.appendChild(spantext2);
+  if (data.login_type) {
+    private_radio.checked = true;
+    select_box.appendChild(private_input);
+    select_box.appendChild(file_btn);
+    select_box.appendChild(pass_input);
+    select_box.appendChild(spantext3);
+    select_box.appendChild(remember_input);
+  } else {
+    passwd_radio.checked = true;
+    select_box.appendChild(pass_input);
+    select_box.appendChild(spantext3);
+    select_box.appendChild(remember_input);
+  }
+  
+  box.appendChild(name_box);
+  box.appendChild(host_box);
+  box.appendChild(user_box);
+  box.appendChild(login_type_box);
+  box.appendChild(select_box);
+}
 
 
 
@@ -29,10 +234,13 @@ function CWindow() {
   this.is_max_window = false;
   this.client = null;
   this.terminal_manager = null;
-  this.folders = {};
+  this.data = [];
+  this.conf = {priv: '', down: ''};
+  document.oncontextmenu = function(evt) { evt.preventDefault(); };
 }
 
 CWindow.prototype.init = function() {
+  let boxes             = func.show_message(2, document.getElementsByTagName('body')[0], '连接后端', '正在连接后端...', 1);
   let obj               = this;
   let f                 = () => {obj.close_box();};
   let app_min_btn       = document.getElementsByClassName('app-min')[0];
@@ -46,9 +254,9 @@ CWindow.prototype.init = function() {
   let app_set_btn       = document.getElementById('setting');
   let app_key_btn       = document.getElementById('key');
   let app_reload_btn    = document.getElementById('reload');
-  this.client           = new sshclient.CSshClient(URL, console.log);
-  this.terminal_manager = new terminal.CTerminalManager(console.log);
-  this.client.init();
+  this.client           = new sshclient.CSshClient(URL);
+  this.terminal_manager = new terminal.CTerminalManager(window, gui.Clipboard.get());
+  this.client.init(() => { obj.on_connect_server(boxes); });
 
   app_min_btn.onclick  = () => { obj.minimize(); };
   app_max_btn.onclick  = () => { obj.maximize(); };
@@ -69,6 +277,13 @@ CWindow.prototype.init = function() {
   } else {
     app_reload_btn.style.display = 'none';
   }
+  func.read_data_file((err, data) => { if (!err && data) { this.data = data; } });
+  func.read_conf_file((err, data) => { this.conf = data; });
+  this.client.reg_event(0, func.PROTOCOL.P_CREATE_KEY, (data) => { this.rep_create_key(data); });
+}
+
+CWindow.prototype.on_connect_server = function(box) {
+  box.remove();
 }
 
 CWindow.prototype.on_resize = function() {
@@ -89,7 +304,11 @@ CWindow.prototype.maximize = function () {
 CWindow.prototype.close_window = function () {
   this.win.hide();
   this.client.exit();
-  this.win.close();
+  func.write_data_file(this.data, (err) => {
+    func.write_conf_file(this.conf, (err) => {
+      this.win.close();
+    });
+  });
 }
 
 CWindow.prototype.open_menu = function(menu_box) {
@@ -149,6 +368,7 @@ CWindow.prototype.quick_connect = function () {
       type: 0,
       user: user_input.value,
       pass: pass_input.value,
+      remember: 1
     });
     obj.close_box();
   };
@@ -176,9 +396,24 @@ CWindow.prototype.folder = function () {
   del_btn.title = '删除';
   title.innerHTML = '连接列表';
 
+  add_btn.onclick = () => { this.open_add_node_box(); };
+  mod_btn.onclick = () => { this.open_mod_node_box(); };
+  del_btn.onclick = () => { this.del_node(); };
+  confirm_btn.onclick = () => {
+    let node = document.getElementById('currentNode');
+    if (node) {
+      this.require_login(node.data);
+    }
+    this.close_box();
+  };
+
   folder_btn.appendChild(add_btn);
   folder_btn.appendChild(mod_btn);
   folder_btn.appendChild(del_btn);
+
+  for (let data of this.data) {
+    this.add_node(folder_ul, data);
+  }
 
   box.appendChild(folder_btn);
   box.appendChild(folder_ul);
@@ -186,15 +421,133 @@ CWindow.prototype.folder = function () {
   full_box.style.display = 'block';
 }
 
-CWindow.prototype.setting = function () {
+CWindow.prototype.click_node = function(node) {
+  let cur_node = document.getElementById('currentNode');
+  if (cur_node) cur_node.id = '';
+  node.id = 'currentNode';
+}
 
+CWindow.prototype.dblclick_node = function(node) {
+  this.require_login(node.data);
+}
+
+CWindow.prototype.add_node = function(parent, data) {
+  let li = document.createElement('li');
+  li.innerHTML = data.name;
+  li.data = data;
+
+  li.onclick = () => { this.click_node(li); };
+  li.ondblclick = () => { this.dblclick_node(li); };
+
+  parent.appendChild(li);
+}
+
+CWindow.prototype.open_add_node_box = function() {
+  create_folder_list_box('新建节点', (box, data) => {
+    let parent = document.getElementById('folder-list');
+    this.data.push(data);
+    this.add_node(parent, data);
+    box.remove();
+  });
+}
+
+CWindow.prototype.open_mod_node_box = function() {
+  let cur_node = document.getElementById('currentNode');
+  if (!cur_node) return;
+  create_folder_list_box('修改节点', (box, data) => {
+    cur_node.innerHTML = data.name;
+    this.data.pop(cur_node.data);
+    cur_node.data = data;
+    box.remove();
+  }, cur_node.data);
+}
+
+CWindow.prototype.del_node = function() {
+  let cur_node = document.getElementById('currentNode');
+  if (!cur_node) return;
+  this.data.pop(cur_node.data);
+  cur_node.remove();
+}
+
+CWindow.prototype.setting = function () {
+  let boxes = func.create_box(document.getElementsByTagName('body')[0], '设置');
+  let full_box = boxes.full_box;
+  let confirm = boxes.confirm;
+  let content = boxes.content;
+  let private_input = document.createElement('input');
+  let private_btn = document.createElement('button');
+  let download_input = document.createElement('input');
+  let download_btn = document.createElement('button');
+
+  private_input.type = 'text';
+  private_input.name = 'privateKeyPath';
+  private_input.placeholder = 'sshKey存储路径(./sshKey/)';
+  private_input.disabled = "true";
+  download_input.type = 'text';
+  download_input.name = 'downloadPath';
+  download_input.placeholder = '下载路径(./download/)';
+  download_input.disabled = "true";
+  private_btn.innerHTML = '..';
+  private_btn.className = 'select-btn';
+  download_btn.innerHTML = '..';
+  download_btn.className = 'select-btn';
+  private_input.value = this.conf.priv;
+  download_input.value = this.conf.down;
+
+  content.appendChild(private_input);
+  content.appendChild(private_btn);
+  content.appendChild(download_input);
+  content.appendChild(download_btn);
+
+  private_btn.onclick = () => { create_select_folder_box(private_input); };
+  download_btn.onclick = () => { create_select_folder_box(download_input); };
+  confirm.onclick = () => {
+    let private_path = private_input.value.trim();
+    let download_path = download_input.value.trim();
+    this.conf.priv = private_path;
+    this.conf.down = download_path;
+    full_box.remove();
+  };
 }
 
 CWindow.prototype.create_key = function () {
+  let boxes = func.create_box(document.getElementsByTagName('body')[0], '创建密钥');
+  let full_box = boxes.full_box;
+  let confirm = boxes.confirm;
+  let content = boxes.content;
+  let key_box = document.createElement('div');
+  let key_input = document.createElement('select');
+  let dsa_opt = document.createElement('option');
+  let rsa_opt = document.createElement('option');
+  let pass_input = document.createElement('input');
 
+  key_box.className = 'keyTypeBox';
+  key_box.innerHTML = '密钥类型';
+  key_input.className = 'keyType';
+  rsa_opt.value = '0';
+  rsa_opt.innerHTML = 'RSA';
+  dsa_opt.value = '1'; 
+  dsa_opt.innerHTML = 'DSA';
+  pass_input.type = 'password'; 
+  pass_input.name = 'keyPassword'; 
+  pass_input.placeholder = '密钥密码';
+
+  key_input.appendChild(rsa_opt);
+  key_input.appendChild(dsa_opt);
+  key_box.appendChild(key_input);
+  content.appendChild(key_box);
+  content.appendChild(pass_input);
+
+  confirm.onclick = () => {
+    let pass = pass_input.value.trim();
+    let type = key_input.value;
+    this.client.create_key(pass, type, this.conf.priv);
+    full_box.remove();
+  };
 }
 
 CWindow.prototype.require_login = function(data) {
+  data = func.deepcopy(data);
   let obj = this;
   let term = new Terminal({
     scrollback: 1024,
@@ -215,7 +568,41 @@ CWindow.prototype.require_login = function(data) {
   data.term = term_id;
   data.row = term.rows;
   data.col = term.cols;
-  this.client.login(data);
+  if (!data.remember) {
+    this.require_password((passwd) => {
+      data.pass = passwd;
+      this.client.login(data);
+    });
+  } else {
+    this.client.login(data);
+  }
+}
+
+CWindow.prototype.require_password = function(callback) {
+  let boxes = func.create_box(document.getElementsByTagName('body')[0], '输入密码', 1);
+  let box = boxes.full_box;
+  let content = boxes.content;
+  let confirm = boxes.confirm;
+  let pass_box = document.createElement('div');
+  let pass_input = document.createElement('input');
+
+  pass_box.className = 'host-info';
+  pass_input.type = 'password';
+  pass_input.name = 'password';
+  pass_input.placeholder = '密码';
+
+  pass_box.appendChild(pass_input);
+  content.appendChild(pass_box);
+
+  confirm.onclick = () => {
+    let pass = pass_input.value.trim();
+    if (pass == '') {
+      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '密码不能为空');
+      return;
+    }
+    callback(pass);
+    box.remove();
+  }
 }
 
 CWindow.prototype.on_key_press = function(term, data) {
@@ -243,6 +630,14 @@ CWindow.prototype.rep_logout = function(data) {
   this.client.remove_event(data.term_id);
 }
 
+CWindow.prototype.rep_create_key = function(data) {
+  if (data.code) {
+    func.show_message(1, document.getElementsByTagName('body')[0], '创建密钥', '创建密钥成功');
+  } else {
+    func.show_message(0, document.getElementsByTagName('body')[0], '创建密钥', data.msg);
+  }
+}
+
 CWindow.prototype.close_box = function() {
   let content = document.getElementsByClassName('msg-content')[0];
   let box = document.getElementsByClassName('full-box')[0];
@@ -251,6 +646,7 @@ CWindow.prototype.close_box = function() {
   for (; content.childElementCount; ) {
     content.firstElementChild.remove();
   }
+  this.terminal_manager.focus();
 }
 
 CWindow.prototype.reload = function () {

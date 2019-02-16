@@ -121,17 +121,17 @@ class CSsh(basesocket.CBaseSocket):
         self.chan.resize_pty(width=cols, height=rows)
 
     @staticmethod
-    def createKey(key_type, passwd, path):
+    def create_key(key_type, passwd, path):
         ret = dict(
             status=True,
-            msg=''
+            msg='success'
         )
         primaryFile = '%s/Identity'%(path,)
         publicFile = '%s/Identity.pub'%(path,)
-        privateFp = open(primaryFile, 'wb')
-        publicFp = open(publicFile, 'wb')
         try:
-            if key_type == '0':
+            privateFp = open(primaryFile, 'wb')
+            publicFp = open(publicFile, 'wb')
+            if key_type == 0:
                 key = paramiko.rsakey.RSAKey.generate(2048)
             else:
                 key = paramiko.dsskey.DSSKey.generate(2048)
@@ -139,24 +139,21 @@ class CSsh(basesocket.CBaseSocket):
                 key.write_private_key(privateFp)
             else:
                 key.write_private_key(privateFp, password=str.encode(passwd.encode()))
+            for data in [key.get_name(),
+                        ' ',
+                        key.get_base64(),
+                        " %s@%s"%(config.current_user, config.hostname)]:
+                publicFp.write(data)
+            privateFp.close()
+            publicFp.close()
         except IOError as e:
             logger.write_log(logger.ERROR, "error: gen key, " + str(e) )
             ret['status'] = False
-            ret['msg'] = 'there was an error writing to the file'
+            ret['msg'] = 'No such file or directory, or Permission denied'
         except paramiko.SSHException:
             logger.write_log(logger.ERROR, "error: gen key, " + str(e))
             ret['status'] = False
             ret['msg'] = 'the key is invalid'
-        else:
-            for data in [key.get_name(),
-                         ' ',
-                         key.get_base64(),
-                         " %s@%s"%(config.current_user, config.hostname)]:
-                publicFp.write(data)
-        finally:
-            privateFp.close()
-            publicFp.close()
-            ret['msg'] = 'success'
         return ret
 
     def getCurrentPath(self):

@@ -17,7 +17,7 @@ class CIOLoop(object):
 
     EVENT_READ = 1<<0
     EVENT_WRITE = 1<<1
-    DELAY = 0.2
+    DELAY = 0.05
 
     def __init__(self):
         self.run = True

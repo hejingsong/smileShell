@@ -14,6 +14,7 @@ login: 主协议(1字节) + 终端编号(1字节) + 远程主机长度(1字节) 
 session: 主协议(1字节) + 终端编号(1字节) + 信息长度(4字节) + 信息
 force_exit: 主协议(1字节) + 终端编号(1字节)
 resize: 主协议(1字节) + row(两个字节) + col(两个字节)
+create_key: 主协议(1字节) + 密钥类型(1字节) + 密码长度(4字节) + 密码 + 保存路径长度(4字节) + 保存路径
 """
 
 """
@@ -21,6 +22,7 @@ resize: 主协议(1字节) + row(两个字节) + col(两个字节)
 login: 主协议(1字节) + 终端编号(1字节) + 标志(1字节) + 错误信息长度(4字节) + 错误信息
 session: 主协议(1字节) + 终端编号(1字节) + 信息长度(4字节) + 信息
 logout: 主协议(1字节) + 终端编号(1字节)
+create_key: 主协议(1字节) + 错误码(1字节) + 错误信息长度(4字节) + 错误信息
 """
 
 # 协议定义
@@ -30,6 +32,7 @@ P_SESSION       = 0x03          # 会话协议
 P_LOGOUT        = 0x04          # 登出协议
 P_FORCE_EXIT    = 0x05          # 强制退出协议
 P_RESIZE        = 0x06          # 终端改变大小协议
+P_CREATE_KEY    = 0x07          # 创建密钥
 
 
 class CPacket(object):
@@ -116,6 +119,7 @@ class CProxy(basesocket.CBaseSocket):
             P_SESSION       : 'session',
             P_FORCE_EXIT    : 'force_exit',
             P_RESIZE        : 'resize',
+            P_CREATE_KEY    : 'create_key'
         }
         super(CProxy, self).__init__(oSocket)
 
@@ -202,6 +206,21 @@ class CProxy(basesocket.CBaseSocket):
         col = packet.unpacket_uint16()
         for term_id, oSsh in self.sshs.iteritems():
             oSsh.resize(row, col)
+        
+    def create_key(self, packet, oLoop):
+        key_type = packet.unpacket_uint8()
+        pass_len = packet.unpacket_uint32()
+        passwd = packet.unpacket_string(pass_len)
+        path_len = packet.unpacket_uint32()
+        path = packet.unpacket_string(path_len)
+        ret = ssh.CSsh.create_key(key_type, passwd, path)
+        msg_len = len(ret['msg'])
+        oPacket = CPacket('')
+        oPacket.packet_uint8(P_CREATE_KEY)
+        oPacket.packet_uint8(ret['status'])
+        oPacket.packet_uint32(msg_len)
+        oPacket.packet_string(ret['msg'], msg_len)
+        self.write_buffer.append(oPacket)
 
     def add_ssh_message(self, term_id, data):
         data = data.encode('utf8')
