@@ -155,13 +155,32 @@ CPacket.prototype.get_buffer = function() {
   return this.buffer;
 }
 
-function remove_add_children(parent) {
+function remove_all_children(parent) {
   while( parent.childElementCount ) {
     parent.firstElementChild.remove();
   }
 }
 
-function show_message(status, parent, title, content, hide=0) {
+function on_node_press(node, box, win, evt) {
+  let is_move = true;
+  let x = evt.pageX - box.offsetLeft;
+  let y = evt.pageY - box.offsetTop;
+  node.style.cursor = 'move';
+  win.onmousemove = function (evt) {
+    if (is_move) {
+        box.style.left = (evt.pageX - x)+"px";
+        box.style.top = (evt.pageY - y)+"px";
+    };
+  }
+  win.onmouseup = function (evt) {
+    is_move = false;
+    node.style.cursor = 'default';
+    node.onmousemove = null;
+    node.onmouseup = null;
+  }
+}
+
+function show_message(status, parent, title, content, win, hide=0) {
   let box = document.createElement('div')
   let msg_box = document.createElement('div');
   let msg_header = document.createElement('div');
@@ -197,6 +216,7 @@ function show_message(status, parent, title, content, hide=0) {
   offset_box.style.height = '10px';
 
   cls_btn.onclick = () => { box.remove(); }
+  msg_header.addEventListener('mousedown', (evt) => {on_node_press(msg_header, msg_box, win, evt);});
 
   if (!hide) {
     msg_header.appendChild(cls_btn);
@@ -213,7 +233,7 @@ function show_message(status, parent, title, content, hide=0) {
   return box;
 }
 
-function create_box(parent, title, hide=0) {
+function create_box(parent, title, win, hide=0) {
   let box = document.createElement('div')
   let msg_box = document.createElement('div');
   let msg_header = document.createElement('div');
@@ -247,6 +267,7 @@ function create_box(parent, title, hide=0) {
 
   cls_btn.onclick = () => { box.remove(); }
   cancel_btn.onclick = () => { box.remove(); }
+  msg_header.addEventListener('mousedown', (evt) => {on_node_press(msg_header, msg_box, win, evt);});
 
   msg_header.appendChild(msg_title);
   msg_header.appendChild(cls_btn);
@@ -517,7 +538,7 @@ exports.CPacket = CPacket;
 exports.write_data_file = write_data_file;
 exports.read_data_file = read_data_file;
 exports.create_box = create_box;
-exports.remove_add_children = remove_add_children;
+exports.remove_all_children = remove_all_children;
 exports.show_message = show_message;
 exports.deepcopy = deepcopy;
 exports.read_conf_file = read_conf_file;

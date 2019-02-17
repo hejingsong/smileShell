@@ -5,7 +5,7 @@
 /**
  * 全局变量定义
  */
-var DEBUG = false;
+var DEBUG = true;
 var appPath = require('path');
 var gui = require('nw.gui');
 var g_win = gui.Window.get();
@@ -69,7 +69,7 @@ function create_folder_list_box(title, confirm_callback) {
       remember: 0
     };
   }
-  let content = func.create_box(document.getElementsByTagName('body')[0], title);  
+  let content = func.create_box(document.getElementsByTagName('body')[0], title, window);  
   let full_box = content.full_box;
   let box = content.content;
   let confirm = content.confirm;
@@ -137,7 +137,7 @@ function create_folder_list_box(title, confirm_callback) {
   remember_input.checked = data.remember;
 
   passwd_radio.onchange = () => {
-    func.remove_add_children(select_box);
+    func.remove_all_children(select_box);
     pass_input.value = data.pass;
     private_input.value = '';
     select_box.appendChild(pass_input);
@@ -170,15 +170,15 @@ function create_folder_list_box(title, confirm_callback) {
     let remember = remember_input.checked ? 1 : 0;
     let pass = pass_input.value.trim();
     if (name == '' || host == '' || user == '' || port == '' || isNaN(port)) {
-      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '输入不合法');
+      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '输入不合法', window);
       return;
     }
     if (login_type && priv == '') {
-      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '输入不合法');
+      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '输入不合法', window);
       return;
     }
     if (remember && pass == '') {
-      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '输入不合法');
+      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '输入不合法', window);
       return;
     }
     pass = remember ? pass : '';
@@ -229,6 +229,8 @@ function CWindow() {
   this.shell = gui.Shell;
   if (DEBUG) {
     this.win.showDevTools();
+  } else {
+    document.oncontextmenu = function(evt) { evt.preventDefault(); };
   }
   this.open_server();
   this.is_max_window = false;
@@ -236,11 +238,10 @@ function CWindow() {
   this.terminal_manager = null;
   this.data = [];
   this.conf = {priv: '', down: ''};
-  document.oncontextmenu = function(evt) { evt.preventDefault(); };
 }
 
 CWindow.prototype.init = function() {
-  let boxes             = func.show_message(2, document.getElementsByTagName('body')[0], '连接后端', '正在连接后端...', 1);
+  let boxes             = func.show_message(2, document.getElementsByTagName('body')[0], '连接后端', '正在连接后端...', window, 1);
   let obj               = this;
   let f                 = () => {obj.close_box();};
   let app_min_btn       = document.getElementsByClassName('app-min')[0];
@@ -470,7 +471,7 @@ CWindow.prototype.del_node = function() {
 }
 
 CWindow.prototype.setting = function () {
-  let boxes = func.create_box(document.getElementsByTagName('body')[0], '设置');
+  let boxes = func.create_box(document.getElementsByTagName('body')[0], '设置', window);
   let full_box = boxes.full_box;
   let confirm = boxes.confirm;
   let content = boxes.content;
@@ -511,7 +512,7 @@ CWindow.prototype.setting = function () {
 }
 
 CWindow.prototype.create_key = function () {
-  let boxes = func.create_box(document.getElementsByTagName('body')[0], '创建密钥');
+  let boxes = func.create_box(document.getElementsByTagName('body')[0], '创建密钥', window);
   let full_box = boxes.full_box;
   let confirm = boxes.confirm;
   let content = boxes.content;
@@ -579,7 +580,7 @@ CWindow.prototype.require_login = function(data) {
 }
 
 CWindow.prototype.require_password = function(callback) {
-  let boxes = func.create_box(document.getElementsByTagName('body')[0], '输入密码', 1);
+  let boxes = func.create_box(document.getElementsByTagName('body')[0], '输入密码', window, 1);
   let box = boxes.full_box;
   let content = boxes.content;
   let confirm = boxes.confirm;
@@ -597,7 +598,7 @@ CWindow.prototype.require_password = function(callback) {
   confirm.onclick = () => {
     let pass = pass_input.value.trim();
     if (pass == '') {
-      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '密码不能为空');
+      func.show_message(0, document.getElementsByTagName('body')[0], '错误', '密码不能为空', window);
       return;
     }
     callback(pass);
@@ -632,9 +633,9 @@ CWindow.prototype.rep_logout = function(data) {
 
 CWindow.prototype.rep_create_key = function(data) {
   if (data.code) {
-    func.show_message(1, document.getElementsByTagName('body')[0], '创建密钥', '创建密钥成功');
+    func.show_message(1, document.getElementsByTagName('body')[0], '创建密钥', '创建密钥成功', window);
   } else {
-    func.show_message(0, document.getElementsByTagName('body')[0], '创建密钥', data.msg);
+    func.show_message(0, document.getElementsByTagName('body')[0], '创建密钥', data.msg, window);
   }
 }
 

@@ -30,8 +30,8 @@ img.nav-close:hover {background-color:red;}
 #key {background: url(/static/img/key.png) no-repeat;}
 #reload {background: url(/static/img/reload.png) no-repeat;}
 .full-box {position: fixed;top: 0px; bottom: 0px; left: 0px; right:0px;background: rgba(128,128,128,0.5);z-index: 1000;}
-.conn-box,.error-box,.folder-box,.new-box,.modify-box,.setting-box,.private-box,.msg-box {width: 500px; margin: 100px auto; z-index: 11; background: #444; padding-right: 20px;}
-.conn-header,.error-header,.folder-header,.new-header,.modify-header,.setting-header,.private-header,.msg-header {display: inline-block; line-height: 32px; height: 32px; width: 500px; border-radius: 5px 5px 0px 0px; color: white; background: #333; padding: 0px 10px;}
+.conn-box,.error-box,.folder-box,.new-box,.modify-box,.setting-box,.private-box,.msg-box {position: absolute; top: 100px; left: calc(50% - 250px); width: 500px; z-index: 11; background: #444; padding-right: 20px;}
+.conn-header,.error-header,.folder-header,.new-header,.modify-header,.setting-header,.private-header,.msg-header {display: inline-block; line-height: 32px; height: 32px; width: 500px; border-radius: 5px 5px 0px 0px; color: white; background: #333; padding: 0px 10px;user-select: none;}
 .conn-header img,.error-header img,.folder-header img,.new-header img,.modify-header img,.setting-header img,.private-header img,.msg-header img {height:15px;width: 15px;border-radius: 50px;margin-top: 8px;float: right;}
 .conn-header img:hover, .error-header img:hover,.folder-header img:hover,.new-header img:hover,.modify-header img:hover,.setting-header img:hover,.private-header img:hover,.msg-header img:hover {background: red;}
 .conn-content,.error-content,.folder-content,.new-content,.modify-content,.setting-content,.private-content,.msg-content {border-top: 1px solid #555; background: #444; width: 500px; padding: 0px 10px;}
