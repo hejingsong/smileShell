@@ -92,3 +92,4 @@ img.nav-close:hover {background-color:red;}
 #currentNode {background-color: orange;color:black !important;}
 .menu { transition: width 0.5s, height 0.5s; -webkit-transition:width 0.5s, height 0.5s; }
 #folder-list li {color: white; box-shadow: 0px 0px 2px #999; padding: 2px 10px; border-radius: 5px; margin-bottom: 2px;}
+#term-box .xterm-rows {padding-left: 1px; width: 100%;}

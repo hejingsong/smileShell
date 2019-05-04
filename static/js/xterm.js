@@ -1847,6 +1847,7 @@
       };
       Renderer.prototype._refresh = function (start, end) {
           var x, y, i, line, out, ch, ch_width, width, data, attr, bg, fg, flags, row, parent, focused = document.activeElement;
+          let line_width = 0;
           if (end - start >= this._terminal.rows / 2) {
               parent = this._terminal.element.parentNode;
               if (parent) {
@@ -1874,9 +1875,18 @@
               else {
                   x = -1;
               }
+              for (line_width = width; line_width >= 0; --line_width ) {
+                if (!line[line_width]) {
+                    continue;
+                }
+                if (line[line_width][1] != ' ') {
+                    break;
+                }
+              }
+              line_width = (line_width > x) ? line_width : x;
               attr = this._terminal.defAttr;
               i = 0;
-              for (; i < width; i++) {
+              for (; i <= line_width; i++) {
                   if (!line[i]) {
                       continue;
                   }
