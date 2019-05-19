@@ -15,9 +15,9 @@ class CIOLoop(object):
 
     """IO监听类，进行IO事件分发"""
 
-    EVENT_READ = 1<<0
-    EVENT_WRITE = 1<<1
-    DELAY = 0.05
+    EVENT_READ = 1 << 0
+    EVENT_WRITE = 1 << 1
+    DELAY = 0.5
 
     def __init__(self):
         self.run = True
@@ -31,18 +31,23 @@ class CIOLoop(object):
         else:
             self.lstWrite.append(executor.fd)
         self.dFd2Obj[executor.fileno()] = executor
-    
-    def remove(self, executor):
-        if executor.fd in self.lstRead:
-            self.lstRead.remove(executor.fd)
-        elif executor.fd in self.lstWrite:
-            self.lstWrite.remove(executor.fd)
-        if executor.fileno() in self.dFd2Obj:
-            self.dFd2Obj.pop(executor.fileno())
+
+    def remove(self, executor, event_type):
+        if (event_type & self.EVENT_READ):
+            if executor.fd in self.lstRead:
+                self.lstRead.remove(executor.fd)
+        if (event_type & self.EVENT_WRITE):
+            if executor.fd in self.lstWrite:
+                self.lstWrite.remove(executor.fd)
+        if (executor.fd not in self.lstRead and
+                executor.fd not in self.lstWrite):
+            if executor.fileno() in self.dFd2Obj:
+                self.dFd2Obj.pop(executor.fileno())
 
     def Run(self):
         while self.run:
-            r, w, _ = select.select(self.lstRead, self.lstWrite, [], self.DELAY)
+            r, w, _ = select.select(
+                self.lstRead, self.lstWrite, [], self.DELAY)
             if r:
                 self.handle_read(r)
             if w:
@@ -54,7 +59,8 @@ class CIOLoop(object):
     def handle_read(self, lstRead):
         for fd in lstRead:
             obj = self._getObj(fd)
-            if not obj: continue
+            if not obj:
+                continue
             obj.on_read(self)
 
     def handle_write(self, lstWrite):

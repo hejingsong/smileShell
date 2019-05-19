@@ -10,3 +10,7 @@ sshKey/
 production/
 .vscode/
 *sublime-*
+build/
+dist/
+*.spec
+

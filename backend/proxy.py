@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-#_*_ coding:utf-8 _*_
+# _*_ coding:utf-8 _*_
 
 import struct
 import weakref
@@ -10,7 +10,8 @@ import basesocket
 
 """
 接受协议
-login: 主协议(1字节) + 终端编号(1字节) + 远程主机长度(1字节) + 远程主机 + 端口(2字节) + 登陆类型(1字节) + 用户名长度(1字节) + 用户名 + 密码/密钥长度(4字节) + 密码/密钥 + row(两个字节) + col(两个字节)
+login: 主协议(1字节) + 终端编号(1字节) + 远程主机长度(1字节) + 远程主机 + 端口(2字节) + 登陆类型(1字节) +
+    用户名长度(1字节) + 用户名 + 密码/密钥长度(4字节) + 密码/密钥 + row(两个字节) + col(两个字节)
 session: 主协议(1字节) + 终端编号(1字节) + 信息长度(4字节) + 信息
 force_exit: 主协议(1字节) + 终端编号(1字节)
 resize: 主协议(1字节) + row(两个字节) + col(两个字节)
@@ -26,13 +27,13 @@ create_key: 主协议(1字节) + 错误码(1字节) + 错误信息长度(4字节
 """
 
 # 协议定义
-P_EXIT          = 0x01          # 应用退出协议
-P_LOGIN         = 0x02          # 登陆协议
-P_SESSION       = 0x03          # 会话协议
-P_LOGOUT        = 0x04          # 登出协议
-P_FORCE_EXIT    = 0x05          # 强制退出协议
-P_RESIZE        = 0x06          # 终端改变大小协议
-P_CREATE_KEY    = 0x07          # 创建密钥
+P_EXIT = 0x01           # 应用退出协议
+P_LOGIN = 0x02          # 登陆协议
+P_SESSION = 0x03        # 会话协议
+P_LOGOUT = 0x04         # 登出协议
+P_FORCE_EXIT = 0x05     # 强制退出协议
+P_RESIZE = 0x06         # 终端改变大小协议
+P_CREATE_KEY = 0x07     # 创建密钥
 
 
 class CPacket(object):
@@ -40,18 +41,18 @@ class CPacket(object):
     def __init__(self, data=None):
         self.offset = 0
         self.buffer = data
-    
+
     def get_buffer(self):
         return self.buffer
-    
+
     def packet_uint8(self, data):
         self.buffer += chr(data)
-    
+
     def packet_uint16(self, data):
         h = (data >> 8) & 0x00ff
         l = data & 0x00ff
         self.buffer += chr(h) + chr(l)
-    
+
     def packet_uint32(self, data):
         d = (data >> 24) & 0x000000ff
         self.buffer += chr(d)
@@ -61,18 +62,18 @@ class CPacket(object):
         self.buffer += chr(d)
         d = data & 0x000000ff
         self.buffer += chr(d)
-    
+
     def packet_string(self, data, len):
         self.buffer += data
-    
+
     def unpacket_uint8(self):
         self.offset += 1
         return self.buffer[self.offset-1]
-    
+
     def unpacket_uint16(self):
         self.offset += 2
         return self.buffer[self.offset - 2] << 8 | self.buffer[self.offset - 1]
-    
+
     def unpacket_uint32(self):
         ret = 0
         d = self.buffer[self.offset]
@@ -85,7 +86,7 @@ class CPacket(object):
         self.offset += 4
         ret |= d
         return ret
-    
+
     def unpacket_string(self, length):
         data = ''
         for i in xrange(length):
@@ -106,7 +107,7 @@ class CProxy(basesocket.CBaseSocket):
         if not cls.instance_:
             cls.instance_ = basesocket.CBaseSocket.__new__(cls)
         return cls.instance_
-    
+
     def __init__(self, oSocket):
         self.sshs = {}
         self.write_buffer = []
@@ -114,12 +115,12 @@ class CProxy(basesocket.CBaseSocket):
         self.data_len = 0
         self.code_length = 0
         self.protocol_map = {
-            P_EXIT          : 'exit',
-            P_LOGIN         : 'login',
-            P_SESSION       : 'session',
-            P_FORCE_EXIT    : 'force_exit',
-            P_RESIZE        : 'resize',
-            P_CREATE_KEY    : 'create_key'
+            P_EXIT:         'exit',
+            P_LOGIN:        'login',
+            P_SESSION:      'session',
+            P_FORCE_EXIT:   'force_exit',
+            P_RESIZE:       'resize',
+            P_CREATE_KEY:   'create_key'
         }
         super(CProxy, self).__init__(oSocket)
 
@@ -132,26 +133,33 @@ class CProxy(basesocket.CBaseSocket):
             return
         protocol = packet.unpacket_uint8()
         sFunc = self.protocol_map.get(protocol)
-        if not sFunc: return
+        if not sFunc:
+            return
         oFunc = getattr(self, sFunc)
-        if not oFunc: return
+        if not oFunc:
+            return
         oFunc(packet, oLoop)
-    
+
     def on_write(self, oLoop):
+        oLoop.remove(self, oLoop.EVENT_WRITE)
         if not self.write_buffer:
             return
         for oPacket in self.write_buffer:
             self.write_(oPacket.get_buffer())
-        
+
         self.write_buffer = []
-    
+
     def close(self):
         self.fd.close()
-    
+
     def exit(self, data, oLoop):
         # 应用退出
         oLoop.stop()
-    
+
+    def add_buffer(self, oPacket, oLoop):
+        self.write_buffer.append(oPacket)
+        oLoop.add(self, oLoop.EVENT_WRITE)
+
     def login(self, packet, oLoop):
         term_id = packet.unpacket_uint8()
         host_len = packet.unpacket_uint8()
@@ -164,16 +172,21 @@ class CProxy(basesocket.CBaseSocket):
         passwd = packet.unpacket_string(pass_len)
         row = packet.unpacket_uint16()
         col = packet.unpacket_uint16()
-        oSsh = ssh.CSsh(None, weakref.ref(self), term_id=term_id, host=host, port=port, user=user, passwd=passwd, row=row, col=col, login_type=login_type)
-        threading.Thread(target=self.do_login, args=(term_id, oSsh,  weakref.ref(oLoop))).start()
+        oSsh = ssh.CSsh(None, weakref.ref(self), term_id=term_id, host=host,
+                        port=port, user=user, passwd=passwd,
+                        row=row, col=col, login_type=login_type)
+        threading.Thread(
+            target=self.do_login,
+            args=(term_id, oSsh, weakref.ref(oLoop))
+        ).start()
 
     def do_login(self, term_id, oSsh, wrLoop):
         oLoop = wrLoop()
-        if not oLoop: return
+        if not oLoop:
+            return
         ret = oSsh.login()
         if ret['status']:
             oLoop.add(oSsh, oLoop.EVENT_READ)
-            oLoop.add(oSsh, oLoop.EVENT_WRITE)
             self.sshs[term_id] = oSsh
         data = ret['data'].encode('utf8')
         msg_len = len(data)
@@ -184,29 +197,31 @@ class CProxy(basesocket.CBaseSocket):
         oPacket.packet_uint8(ret['status'])
         oPacket.packet_uint32(msg_len)
         oPacket.packet_string(data, msg_len)
-        self.write_buffer.append(oPacket)
+        self.add_buffer(oPacket, oLoop)
 
     def session(self, packet, oLoop):
         term_id = packet.unpacket_uint8()
         msg_len = packet.unpacket_uint32()
         msg = packet.unpacket_string(msg_len)
         oSsh = self.sshs.get(term_id)
-        if not oSsh: return
-        oSsh.session(msg)
-    
+        if not oSsh:
+            return
+        oSsh.session(msg, oLoop)
+
     def force_exit(self, packet, oLoop):
         term_id = packet.unpacket_uint8()
         oSsh = self.sshs.get(term_id)
-        if not oSsh: return
+        if not oSsh:
+            return
         oSsh.force_exit(oLoop)
         self.sshs.pop(term_id)
-    
+
     def resize(self, packet, oLoop):
         row = packet.unpacket_uint16()
         col = packet.unpacket_uint16()
         for term_id, oSsh in self.sshs.iteritems():
             oSsh.resize(row, col)
-        
+
     def create_key(self, packet, oLoop):
         key_type = packet.unpacket_uint8()
         pass_len = packet.unpacket_uint32()
@@ -220,9 +235,9 @@ class CProxy(basesocket.CBaseSocket):
         oPacket.packet_uint8(ret['status'])
         oPacket.packet_uint32(msg_len)
         oPacket.packet_string(ret['msg'], msg_len)
-        self.write_buffer.append(oPacket)
+        self.add_buffer(oPacket, oLoop)
 
-    def add_ssh_message(self, term_id, data):
+    def add_ssh_message(self, term_id, data, oLoop):
         data = data.encode('utf8')
         msg_len = len(data)
         oPacket = CPacket('')
@@ -230,15 +245,15 @@ class CProxy(basesocket.CBaseSocket):
         oPacket.packet_uint8(term_id)
         oPacket.packet_uint32(msg_len)
         oPacket.packet_string(data, msg_len)
-        self.write_buffer.append(oPacket)
-    
-    def add_ssh_logout(self, term_id):
+        self.add_buffer(oPacket, oLoop)
+
+    def add_ssh_logout(self, term_id, oLoop):
         oPacket = CPacket('')
         oPacket.packet_uint8(P_LOGOUT)
         oPacket.packet_uint8(term_id)
-        self.write_buffer.append(oPacket)
+        self.add_buffer(oPacket, oLoop)
         self.sshs.pop(term_id)
-    
+
     def write_(self, sMsg):
         # 发送字符串
         message = sMsg
@@ -259,7 +274,7 @@ class CProxy(basesocket.CBaseSocket):
             data += c
 
         back_str = str(data) + message
-        if back_str != None and len(back_str) > 0:
+        if back_str is not None and len(back_str) > 0:
             self.fd.sendall(back_str)
 
     def parse_data(self, data):

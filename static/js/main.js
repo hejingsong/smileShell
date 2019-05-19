@@ -227,11 +227,8 @@ function create_folder_list_box(title, confirm_callback) {
 function CWindow() {
   this.win = g_win;
   this.shell = gui.Shell;
-  if (DEBUG) {
-    this.win.showDevTools();
-  } else {
+  if (!DEBUG)
     document.oncontextmenu = function(evt) { evt.preventDefault(); };
-  }
   this.open_server();
   this.is_max_window = false;
   this.client = null;
@@ -278,7 +275,7 @@ CWindow.prototype.init = function() {
   } else {
     app_reload_btn.style.display = 'none';
   }
-  func.read_data_file((err, data) => { if (!err && data) { this.data = data; } });
+  func.read_data_file((err, data) => { if (!err && data) { this.data = data;} });
   func.read_conf_file((err, data) => { this.conf = data; });
   this.client.reg_event(0, func.PROTOCOL.P_CREATE_KEY, (data) => { this.rep_create_key(data); });
 }
@@ -313,11 +310,11 @@ CWindow.prototype.close_window = function () {
 }
 
 CWindow.prototype.open_menu = function(menu_box) {
-  menu_box.style.transform = "translateX(0px)";
+  menu_box.style.transform = "translateX(-6px)";
 }
 
 CWindow.prototype.close_menu = function (menu_box) {
-  menu_box.style.transform = "translateX(60px)";
+  menu_box.style.transform = "translateX(66px)";
 }
 
 CWindow.prototype.open_server = function () {
@@ -457,7 +454,8 @@ CWindow.prototype.open_mod_node_box = function() {
   if (!cur_node) return;
   create_folder_list_box('修改节点', (box, data) => {
     cur_node.innerHTML = data.name;
-    this.data.pop(cur_node.data);
+    let idx = this.data.indexOf(cur_node.data);
+    this.data.splice(idx, 1, data);
     cur_node.data = data;
     box.remove();
   }, cur_node.data);
@@ -563,6 +561,7 @@ CWindow.prototype.require_login = function(data) {
     (term, data) => { obj.on_key_press(term, data); },
     (term) => { obj.force_close_terminal(term); }
   );
+  term.setOption('cursorStyle', 'underline');
   this.client.reg_event(term_id, func.PROTOCOL.P_LOGIN, (data) => { obj.rep_login(data); });
   this.client.reg_event(term_id, func.PROTOCOL.P_SESSION, (data) => { obj.rep_session(data); });
   this.client.reg_event(term_id, func.PROTOCOL.P_LOGOUT, (data) => { obj.rep_logout(data); });

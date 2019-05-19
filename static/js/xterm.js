@@ -1875,14 +1875,7 @@
               else {
                   x = -1;
               }
-              for (line_width = width; line_width >= 0; --line_width ) {
-                if (!line[line_width]) {
-                    continue;
-                }
-                if (line[line_width][1] != ' ') {
-                    break;
-                }
-              }
+              line_width = this._terminal.getTextLen(line);
               line_width = (line_width > x) ? line_width : x;
               attr = this._terminal.defAttr;
               i = 0;
@@ -3893,6 +3886,22 @@
           }
       }
       return keys;
+  }
+  Terminal.prototype.getTextLen = function(line) {
+    if (!line || !line.length) return 0;
+
+    let width = line.length;
+    let line_width = width;
+
+    for (; line_width >= 0; --line_width ) {
+      if (!line[line_width]) {
+        continue;
+      }
+      if (line[line_width][1] != ' ') {
+        break;
+      }
+    }
+    return line_width;
   }
   Terminal.EventEmitter = EventEmitter_1.EventEmitter;
   Terminal.inherits = inherits;

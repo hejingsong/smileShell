@@ -10,6 +10,8 @@ function CMyTerminal(manager) {
   this.nav_cls_btn = null;
   this.terminal = null;
   this.manager = manager;
+  this.clipboard_event = document.createEvent("HTMLEvents");
+  this.clipboard_event.clipboardData = this.manager.clipboard;
   this.term_id = func.UUID();
 }
 
@@ -39,20 +41,15 @@ CMyTerminal.prototype.copy_handler = function(evt) {
   if ( evt.button != 0 ) {
     return false;
   }
-  let copiedText = this.manager.win.getSelection().toString()
-      , text = func.prepareTextForClipboard(copiedText);
-  if ( text == '' ) { return false; }
-  this.manager.clipboard.set(text, 'text');
-  evt.preventDefault();
+  this.clipboard_event.initEvent("copy", false, false);
+  this.terminal.element.dispatchEvent(this.clipboard_event);
 }
 
 CMyTerminal.prototype.paste_handler = function(evt) {
   if ( evt.button != 2 ) 
     return false;
-  evt.stopPropagation();
-  let text = this.manager.clipboard.get('text');
-  if ( text == '' ) return false;
-  this.on_key_event(this, text);
+  this.clipboard_event.initEvent("paste", false, false);
+  this.terminal.element.dispatchEvent(this.clipboard_event);
 }
 
 CMyTerminal.prototype.create_nav = function(parent, title, force_exit_func) {
@@ -153,6 +150,15 @@ CMyTerminal.prototype.focus = function() {
 function CTerminalManager(win, clipboard) {
   this.win = win;
   this.clipboard = clipboard;
+
+  this.clipboard.setData = (type, text) => {
+    this.clipboard.set(text, 'text');
+  }
+
+  this.clipboard.getData = (type) => {
+    return this.clipboard.get('text');
+  }
+
   this.active_term_id = 0;
   this.terminals = {};
 }

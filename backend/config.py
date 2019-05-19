@@ -12,7 +12,7 @@ base_dir = os.path.abspath('.').replace('\\', '/')
 base_dir = os.path.dirname(base_dir)
 log_dir  = base_dir + '/log'
 data_dir = base_dir + '/data'
-conf_dir = base_dir + '/conf'
+# conf_dir = base_dir + '/conf'
 down_dir = base_dir + '/download'
 key_dir  = base_dir + '/sshkey'
 
@@ -22,8 +22,8 @@ sock_port = 12345
 current_user = getpass.getuser()
 hostname = socket.gethostname()
 
-data_file = "%s/%s.dat" % (data_dir, current_user)
-conf_file = '%s/%s.conf' % (conf_dir, current_user)
+# data_file = "%s/%s.dat" % (data_dir, current_user)
+# conf_file = '%s/%s.conf' % (conf_dir, current_user)
 
 BUFFER_SIZE = 16
 REQUEST_LOGIN = 0

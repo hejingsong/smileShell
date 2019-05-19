@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-#_*_ coding:utf-8 _*_
+# _*_ coding:utf-8 _*_
 
 
 import os
@@ -36,7 +36,7 @@ class CWebSocketServer(basesocket.CBaseSocket):
         '''判断是否是websocket协议'''
         headers = dict()
         recv_buffer = ''
-        recv_buffer += bytes.decode( sock.recv(1024) )
+        recv_buffer += bytes.decode(sock.recv(1024))
         if recv_buffer.find('\r\n\r\n') == -1:
             return False
 
@@ -44,27 +44,28 @@ class CWebSocketServer(basesocket.CBaseSocket):
         for line in header.split('\r\n')[1:]:
             k, v = line.split(': ', 1)
             headers[k] = v
-        headers['Location'] = ("ws://%s%s" %(headers["Host"], '/'))
+        headers['Location'] = ("ws://%s%s" % (headers["Host"], '/'))
         key = headers['Sec-WebSocket-Key']
-        token = base64.b64encode(hashlib.sha1(str.encode(str(key + self.GUID))).digest())
-        handshake="HTTP/1.1 101 Switching Protocols\r\n"\
+        token = base64.b64encode(hashlib.sha1(
+            str.encode(str(key + self.GUID))).digest())
+        handshake = "HTTP/1.1 101 Switching Protocols\r\n"\
             "Upgrade: websocket\r\n"\
             "Connection: Upgrade\r\n"\
             "Sec-WebSocket-Accept: "+bytes.decode(token)+"\r\n"\
             "WebSocket-Origin: "+str(headers["Origin"])+"\r\n"\
             "WebSocket-Location: "+str(headers["Location"])+"\r\n\r\n"
-        sock.send( str.encode( str( handshake ) ) )
+        sock.send(str.encode(str(handshake)))
         return True
 
     def on_read(self, oLoop):
         clt, clt_info = self.fd.accept()
         if not self.valid(clt):
             return
-        logger.write_log(logger.LOG, "client is link. info %s:%s"%clt_info)
+        logger.write_log(logger.LOG, "client is link. info %s:%s" % clt_info)
         oProxy = proxy.CProxy(clt)
         oLoop.add(oProxy, oLoop.EVENT_READ)
-        oLoop.add(oProxy, oLoop.EVENT_WRITE)
-        oLoop.remove(self)
+        # oLoop.add(oProxy, oLoop.EVENT_WRITE)
+        oLoop.remove(self, oLoop.EVENT_READ)
 
     def start(self, oLoop):
         try:

@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-#_*_ coding:utf-8 _*_
+# _*_ coding:utf-8 _*_
 
 import re
 import json
@@ -11,6 +11,7 @@ import logger
 import basesocket
 
 HANDLER = re.compile(r'^.*pwd\r\n(.*)\r\n.*$')
+
 
 class CSsh(basesocket.CBaseSocket):
 
@@ -38,15 +39,16 @@ class CSsh(basesocket.CBaseSocket):
 
     def on_read(self, oLoop):
         oProxy = self.proxy()
-        if not oProxy:return
+        if not oProxy:
+            return
 
         data = self.read()
         if not data:
-            oLoop.remove(self)
-            oProxy.add_ssh_logout(self.term_id)
+            oLoop.remove(self, oLoop.EVENT_READ | oLoop.EVENT_WRITE)
+            oProxy.add_ssh_logout(self.term_id, oLoop)
         else:
-            oProxy.add_ssh_message(self.term_id, data)
-    
+            oProxy.add_ssh_message(self.term_id, data, oLoop)
+
     def on_write(self, oLoop):
         if not self.write_buffer:
             return
@@ -56,6 +58,7 @@ class CSsh(basesocket.CBaseSocket):
         except socket.error:
             pass
         self.write_buffer = []
+        oLoop.remove(self, oLoop.EVENT_WRITE)
 
     def login(self):
         ret = dict(term_id=self.term_id, status=1, data=u'')
@@ -80,11 +83,15 @@ class CSsh(basesocket.CBaseSocket):
                     key_filename=self.key.replace('\\', '/'),
                     timeout=1.5         # 这里不能链接太长时间, 不然会阻塞整个进程
                 )
-            self.chan = self.clt.invoke_shell(term='xterm', width=self.col, height=self.row)
+            self.chan = self.clt.invoke_shell(
+                term='xterm',
+                width=self.col,
+                height=self.row)
             self.fd = self.chan
         except socket.error as _:
             ret['status'] = 0
-            ret['data'] = u'Connection ssh server failed. Please check the host and port.'
+            ret['data'] = u'Connection ssh server failed. '
+            ret['data'] += u'Please check the host and port.'
         except paramiko.BadHostKeyException as _:
             ret['status'] = 0
             ret['data'] = u'Wrong key file.'
@@ -93,7 +100,8 @@ class CSsh(basesocket.CBaseSocket):
             ret['data'] = u'username or password error'
         except paramiko.SSHException as _:
             ret['status'] = 0
-            ret['data'] = u'An unknown error occurred while connecting to ssh server.'
+            ret['data'] = u'An unknown error occurred '
+            ret['data'] += u'while connecting to ssh server.'
         return ret
 
     def read(self):
@@ -108,14 +116,15 @@ class CSsh(basesocket.CBaseSocket):
         else:
             return data
 
-    def session(self, msg):
+    def session(self, msg, oLoop):
         self.write_buffer.append(msg)
-    
+        oLoop.add(self, oLoop.EVENT_WRITE)
+
     def force_exit(self, oLoop):
         self.write_buffer = []
         self.chan.close()
         self.clt.close()
-        oLoop.remove(self)
+        oLoop.remove(self, oLoop.EVENT_READ | oLoop.EVENT_WRITE)
 
     def resize(self, rows, cols):
         self.chan.resize_pty(width=cols, height=rows)
@@ -126,8 +135,8 @@ class CSsh(basesocket.CBaseSocket):
             status=True,
             msg='success'
         )
-        primaryFile = '%s/Identity'%(path,)
-        publicFile = '%s/Identity.pub'%(path,)
+        primaryFile = '%s/Identity' % (path,)
+        publicFile = '%s/Identity.pub' % (path,)
         try:
             privateFp = open(primaryFile, 'wb')
             publicFp = open(publicFile, 'wb')
@@ -138,16 +147,21 @@ class CSsh(basesocket.CBaseSocket):
             if len(passwd) == 0:
                 key.write_private_key(privateFp)
             else:
-                key.write_private_key(privateFp, password=str.encode(passwd.encode()))
-            for data in [key.get_name(),
-                        ' ',
-                        key.get_base64(),
-                        " %s@%s"%(config.current_user, config.hostname)]:
+                key.write_private_key(
+                    privateFp,
+                    password=str.encode(passwd.encode())
+                )
+            for data in [
+                key.get_name(),
+                ' ',
+                key.get_base64(),
+                " %s@%s" % (config.current_user, config.hostname)
+            ]:
                 publicFp.write(data)
             privateFp.close()
             publicFp.close()
         except IOError as e:
-            logger.write_log(logger.ERROR, "error: gen key, " + str(e) )
+            logger.write_log(logger.ERROR, "error: gen key, " + str(e))
             ret['status'] = False
             ret['msg'] = 'No such file or directory, or Permission denied'
         except paramiko.SSHException:
@@ -172,7 +186,7 @@ class CSsh(basesocket.CBaseSocket):
             currentPath = self.handler.findall(recvData)
             if len(currentPath) == 0:
                 return'~'
-            else: 
+            else:
                 return currentPath[0]
         except:
             logger.write_log(logger.ERROR, 'can\'t found current path.')
@@ -182,10 +196,11 @@ class CSsh(basesocket.CBaseSocket):
 
     def upload(self, fileName, remote_path):
         file = fileName.split('/')[-1]
-        data = u'%s 上传成功'%(file, )
+        data = u'%s 上传成功' % (file,)
         sftpClient = None
         try:
-            sftpClient = paramiko.SFTPClient.from_transport(self.clt.get_transport())
+            sftpClient = paramiko.SFTPClient.from_transport(
+                self.clt.get_transport())
             sftpClient.put(fileName, remote_path+'/'+file)
         except paramiko.SSHException as e:
             data = str(e)
@@ -207,10 +222,11 @@ class CSsh(basesocket.CBaseSocket):
         else:
             remoteFile = remote_path + '/' + fileName.strip()
         fileName = fileName.split('/')[-1]
-        data = u'%s 下载成功' %(fileName,)
+        data = u'%s 下载成功' % (fileName,)
 
         try:
-            sftpClient = paramiko.SFTPClient.from_transport(self.clt.get_transport())
+            sftpClient = paramiko.SFTPClient.from_transport(
+                self.clt.get_transport())
             sftpClient.get(remoteFile, path+'/'+fileName)
         except paramiko.SSHException as e:
             data = str(e)

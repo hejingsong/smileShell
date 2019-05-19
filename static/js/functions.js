@@ -365,6 +365,7 @@ function decode_data(codes) {
     login_type = 0;
     remember = 0;
     term_codes = [];
+    pass_codes = [];
     term_name_len = codes[offset];
     offset += 1;
     for (let i = 0; i < term_name_len; i++) {
@@ -522,14 +523,6 @@ function deepcopy(data) {
   return ret;
 }
 
-function prepareTextForClipboard(text) {
-  var space = String.fromCharCode(32), nonBreakingSpace = String.fromCharCode(160), allNonBreakingSpaces = new RegExp(nonBreakingSpace, 'g'), processedText = text.split('\n').map(function (line) {
-      var processedLine = line.replace(/\s+$/g, '').replace(allNonBreakingSpaces, space);
-      return processedLine;
-  }).join('\n');
-  return processedText;
-}
-
 exports.UUID = UUID;
 exports.hover = hover;
 exports.PROTOCOL = PROTOCOL;
@@ -543,4 +536,3 @@ exports.show_message = show_message;
 exports.deepcopy = deepcopy;
 exports.read_conf_file = read_conf_file;
 exports.write_conf_file = write_conf_file;
-exports.prepareTextForClipboard = prepareTextForClipboard;
