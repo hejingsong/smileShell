@@ -9,10 +9,12 @@ function CMyTerminal(manager) {
   this.nav_img = null;
   this.nav_cls_btn = null;
   this.terminal = null;
+  this.terminal_parent = null;
   this.manager = manager;
   this.clipboard_event = document.createEvent("HTMLEvents");
   this.clipboard_event.clipboardData = this.manager.clipboard;
   this.term_id = func.UUID();
+  this.move = false;
 }
 
 CMyTerminal.prototype.create = function(term, parent, on_key_event) {
@@ -29,6 +31,7 @@ CMyTerminal.prototype.create = function(term, parent, on_key_event) {
   });
   this.on_key_event = on_key_event;
   this.terminal = term;
+  this.terminal_parent = parent;
   this.container = container;
   if (this.manager.get_terminal_num() == 0) {
     this.container.style.background = '#000';
@@ -46,7 +49,7 @@ CMyTerminal.prototype.copy_handler = function(evt) {
 }
 
 CMyTerminal.prototype.paste_handler = function(evt) {
-  if ( evt.button != 2 ) 
+  if ( evt.button != 2 )
     return false;
   this.clipboard_event.initEvent("paste", false, false);
   this.terminal.element.dispatchEvent(this.clipboard_event);
@@ -69,6 +72,10 @@ CMyTerminal.prototype.create_nav = function(parent, title, force_exit_func) {
 
   nav.onclick = () => {
     this.manager.active_terminal(this.term_id);
+  }
+
+  nav.ondblclick = () => {
+    this.manager.copy_terminal(this.term_id);
   }
 
   cls_img.onclick = () => {
@@ -99,6 +106,7 @@ CMyTerminal.prototype.set_inactive = function() {
 CMyTerminal.prototype.set_active = function() {
   this.container.style.zIndex = 1;
   this.nav.className = 'nav-active';
+  this.nav_img.src = 'static/img/true.png';
   this.terminal.focus();
 }
 
@@ -115,6 +123,9 @@ CMyTerminal.prototype.destroy = function() {
 
 CMyTerminal.prototype.write = function(data) {
   this.terminal.write(data);
+  if (this.nav.className === '') {
+    this.nav_img.src = 'static/img/warning.png';
+  }
 }
 
 CMyTerminal.prototype.get_id = function() {
@@ -235,6 +246,10 @@ CTerminalManager.prototype.focus = function() {
   let term = this.terminals[this.active_term_id];
   if (!term) return;
   term.focus();
+}
+
+CTerminalManager.prototype.copy_terminal = function(term_id) {
+
 }
 
 

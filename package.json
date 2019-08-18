@@ -1,7 +1,7 @@
 {
     "name": "SmileShell",
     "main": "index.html",
-    "version": "1.6.4",
+    "version": "1.6.5",
     "author": "nisonGe",
     "window": {
         "toolbar": false,

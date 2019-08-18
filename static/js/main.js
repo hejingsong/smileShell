@@ -5,7 +5,7 @@
 /**
  * 全局变量定义
  */
-var DEBUG = true;
+var DEBUG = false;
 var appPath = require('path');
 var gui = require('nw.gui');
 var g_win = gui.Window.get();
@@ -69,7 +69,7 @@ function create_folder_list_box(title, confirm_callback) {
       remember: 0
     };
   }
-  let content = func.create_box(document.getElementsByTagName('body')[0], title, window);  
+  let content = func.create_box(document.getElementsByTagName('body')[0], title, window);
   let full_box = content.full_box;
   let box = content.content;
   let confirm = content.confirm;
@@ -214,7 +214,7 @@ function create_folder_list_box(title, confirm_callback) {
     select_box.appendChild(spantext3);
     select_box.appendChild(remember_input);
   }
-  
+
   box.appendChild(name_box);
   box.appendChild(host_box);
   box.appendChild(user_box);
@@ -229,6 +229,10 @@ function CWindow() {
   this.shell = gui.Shell;
   if (!DEBUG)
     document.oncontextmenu = function(evt) { evt.preventDefault(); };
+
+  window.ondragover = function(e) { e.preventDefault(); return false; };
+  window.ondrop = function(e) { e.preventDefault(); return false; };
+
   this.open_server();
   this.is_max_window = false;
   this.client = null;
@@ -267,7 +271,7 @@ CWindow.prototype.init = function() {
   for (let btn of box_cls_btns) {
     btn.onclick = f;
   }
-  
+
   func.hover(app_menu_btn, () => { this.open_menu(app_menu_box); }, () => { this.close_menu(app_menu_box); } );
 
   if (DEBUG) {
@@ -366,7 +370,8 @@ CWindow.prototype.quick_connect = function () {
       type: 0,
       user: user_input.value,
       pass: pass_input.value,
-      remember: 1
+      remember: 1,
+      name: host_input.value
     });
     obj.close_box();
   };
@@ -390,7 +395,7 @@ CWindow.prototype.folder = function () {
   add_btn.title = '新建';
   mod_btn.src = 'static/img/modify.png';
   mod_btn.title = '修改';
-  del_btn.src = 'static/img/close.png'; 
+  del_btn.src = 'static/img/close.png';
   del_btn.title = '删除';
   title.innerHTML = '连接列表';
 
@@ -525,10 +530,10 @@ CWindow.prototype.create_key = function () {
   key_input.className = 'keyType';
   rsa_opt.value = '0';
   rsa_opt.innerHTML = 'RSA';
-  dsa_opt.value = '1'; 
+  dsa_opt.value = '1';
   dsa_opt.innerHTML = 'DSA';
-  pass_input.type = 'password'; 
-  pass_input.name = 'keyPassword'; 
+  pass_input.type = 'password';
+  pass_input.name = 'keyPassword';
   pass_input.placeholder = '密钥密码';
 
   key_input.appendChild(rsa_opt);
@@ -557,7 +562,7 @@ CWindow.prototype.require_login = function(data) {
     term,
     document.getElementById('term-box'),
     document.getElementsByClassName('conn-nav')[0],
-    data.host,
+    data.name,
     (term, data) => { obj.on_key_press(term, data); },
     (term) => { obj.force_close_terminal(term); }
   );
