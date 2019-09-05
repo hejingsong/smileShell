@@ -6,7 +6,7 @@
 /**
  * 发送
  * exit: 主协议(1字节)
- * login: 主协议(1字节) + 终端编号(1字节) + 远程主机长度(1字节) + 远程主机 + 端口(2字节) + 登陆类型(1字节) + 用户名长度(1字节) + 用户名 + 密码/密钥长度(4字节) + 密码/密钥 + row(两个字节) + col(两个字节)
+ * login: 主协议(1字节) + 终端编号(1字节) + 远程主机长度(1字节) + 远程主机 + 端口(2字节) + 登陆类型(1字节) + 用户名长度(1字节) + 用户名 + 密码长度(4字节) + 密码 + 密钥长度(4字节) + 密钥 + row(两个字节) + col(两个字节)
  * session: 主协议(1字节) + 终端编号(1字节) + 信息长度(4字节) + 信息
  * force_exit: 主协议(1字节) + 终端编号(1字节)
  * resize: 主协议(1字节) + row(两个字节) + col(两个字节)
@@ -80,10 +80,12 @@ CSshClient.prototype.login = function(data) {
   let host_codes = func.str2utf8(data.host);
   let user_codes = func.str2utf8(data.user);
   let pass_codes = func.str2utf8(data.pass);
+  let priv_codes = func.str2utf8(data.priv || '');
   let host_len = host_codes.length;
   let user_len = user_codes.length;
   let pass_len = pass_codes.length;
-  let total_len = 1 + 1 + 1 + host_len + 2 + 1 + 1 + user_len + 4 + pass_len + 2 + 2;
+  let priv_len = priv_codes.length;
+  let total_len = 1 + 1 + 1 + host_len + 2 + 1 + 1 + user_len + 4 + pass_len + 4 + priv_len + 2 + 2;
   let packet = new func.CPacket(null, total_len);
 
   packet.packet_uint8(func.PROTOCOL.P_LOGIN);
@@ -91,11 +93,13 @@ CSshClient.prototype.login = function(data) {
   packet.packet_uint8(host_len);
   packet.packet_string(host_codes, host_len);
   packet.packet_uint16(data.port);
-  packet.packet_uint8(data.type);
+  packet.packet_uint8(data.login_type);
   packet.packet_uint8(user_len);
   packet.packet_string(user_codes, user_len);
   packet.packet_uint32(pass_len);
   packet.packet_string(pass_codes, pass_len);
+  packet.packet_uint32(priv_len);
+  packet.packet_string(priv_codes, priv_len);
   packet.packet_uint16(data.row);
   packet.packet_uint16(data.col);
   this.send(packet);

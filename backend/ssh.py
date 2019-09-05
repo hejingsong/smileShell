@@ -25,6 +25,7 @@ class CSsh(basesocket.CBaseSocket):
         self.row = kwargs['row']
         self.col = kwargs['col']
         self.loginType = kwargs['login_type']
+        self.key = kwargs['priv']
         self.proxy = wrProxy
         self.write_buffer = []
         self.clt = None

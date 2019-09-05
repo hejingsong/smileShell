@@ -146,7 +146,7 @@ function create_folder_list_box(title, confirm_callback) {
   };
 
   private_radio.onchange = () => {
-    func.remove_add_children(select_box);
+    func.remove_all_children(select_box);
     private_input.value = data.priv;
     pass_input.value = data.pass;
     select_box.appendChild(private_input);
@@ -367,7 +367,7 @@ CWindow.prototype.quick_connect = function () {
     obj.require_login({
       host: host_input.value,
       port: parseInt(port_input.value, 10),
-      type: 0,
+      login_type: 0,
       user: user_input.value,
       pass: pass_input.value,
       remember: 1,

@@ -170,11 +170,13 @@ class CProxy(basesocket.CBaseSocket):
         user = packet.unpacket_string(user_len)
         pass_len = packet.unpacket_uint32()
         passwd = packet.unpacket_string(pass_len)
+        priv_len = packet.unpacket_uint32()
+        priv = packet.unpacket_string(priv_len)
         row = packet.unpacket_uint16()
         col = packet.unpacket_uint16()
         oSsh = ssh.CSsh(None, weakref.ref(self), term_id=term_id, host=host,
                         port=port, user=user, passwd=passwd,
-                        row=row, col=col, login_type=login_type)
+                        row=row, col=col, login_type=login_type, priv=priv)
         threading.Thread(
             target=self.do_login,
             args=(term_id, oSsh, weakref.ref(oLoop))
